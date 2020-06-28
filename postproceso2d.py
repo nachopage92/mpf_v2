@@ -356,12 +356,22 @@ class Meshfree2d_Postproceso_Data():
         if not path.exists(self.sol_aprox_figure_folder):
             makedirs(self.sol_aprox_figure_folder)
 
+        ## plotear ALGUNOS puntos
+        #       ------              EN DESARROLLO!!!
+        #from math import ceil # redondeo hacia arriba
+        #nxlim = 31 ; nylim = 31
+        #nxint,nyint = [ int(nx) , int(ny) ] ; short_list=[]
+        #if ( nxint > nxlim or nyint < nylim ):
+        #    stepx,stepy = [ int(nxint/nxlim) , int(nyint/nylim) ]
+        #    restx,resty = [ nxint%nxlim , nyint%nylim ]
+        #    jumpx,jumpy = [ ceil(nxlim/restx) , ceil(nylim/resty) ]
+
         PLOT_DISPLACEMENT(titulo,self.geometry.coord,self.solution.displ,\
             self.sol_aprox_export_filename[0],is_latex,self.show)
 
-        PLOT_DISPLACEMENT_VECTOR(titulo,self.geometry.coord,self.solution.displ,\
-            new_line,new_tria,self.sol_aprox_export_filename[2],is_latex,\
-            self.show)
+        #PLOT_DISPLACEMENT_VECTOR(titulo,self.geometry.coord,self.solution.displ,\
+        #    new_line,new_tria,self.sol_aprox_export_filename[2],is_latex,\
+        #    self.show)
 
         PLOT_TRACTION(titulo,self.geometry.coord,self.solution.tracc,\
             self.sol_aprox_export_filename[1],is_latex,self.show)

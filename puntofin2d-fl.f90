@@ -49,18 +49,18 @@
 !CCCC----------> LECTURA DE NUBES PARA CALCULO DE LA FUNCION DE FORMA PARA ALISADO
 
       CALL CLOUDS_DATA(ILONG,NNOD,CL_CONECT,NPUNTOS,X,Y,FILE,0)
-!
-!!CCCC----------> CALCULO DE LA FUNCION DE FORMA PARA ALISADO
-!      
-!      NCONS=6
-!      iweigt=0
-!      CALL N_DN_D2N(NCONS,NNOD,IWEIGT,NPUNTOS,CL_CONECT,X,Y,dmax,RM)
-!      DO INOD=1,NNOD
-!        DO I=1,NPUNTOS(INOD)
-!           RMA(1,I,INOD)=RM(1,I,INOD)
-!!c           write(*,*) rma(1,i,inod)
-!        END DO
-!      END DO
+
+!CCCC----------> CALCULO DE LA FUNCION DE FORMA PARA ALISADO
+      
+      NCONS=6
+      iweigt=0
+      CALL N_DN_D2N(NCONS,NNOD,IWEIGT,NPUNTOS,CL_CONECT,X,Y,dmax,RM)
+      DO INOD=1,NNOD
+        DO I=1,NPUNTOS(INOD)
+           RMA(1,I,INOD)=RM(1,I,INOD)
+!c           write(*,*) rma(1,i,inod)
+        END DO
+      END DO
 
 !CCCC----------> LECTURA DE NUBES PARA CALCULO DE LA FUNCION DE FORMA Y SUS DERIVADAS
       
@@ -351,7 +351,8 @@
         END DO 
         
 !CCCC----------> CALCULO DE LA MATRIZ  "CT * C" 
-        
+
+        D = 0d0 !iniciar variable como zero
         DO J1=1,NCONS
           DO J2=1,NCONS 
             SUM=0 
@@ -682,9 +683,7 @@
      & ,APKB(NNOD)
       REAL*8 B(NNOD),PRESS(NNOD),S(32,NNOD),RFIX_VALUE(NFIX)
            
-      !CONJERR=1.D-6
-      !CONJERR=1.D-14
-      CONJERR=1.D-18
+      CONJERR=1.D-14
 
       DO IFIX=1,NFIX
         PRESS(IFIX_NODE(IFIX))=RFIX_VALUE(IFIX)
@@ -1135,19 +1134,19 @@
      &  RFIXV_VALUE,RFIXP_VALUEN,NNOD,NPUNTOS,NPUNTOSN,CL_CONECT, &
      &  CL_CONECTN)
       
-!CCCC----------> RESUELVE EL SISTEMA DE ECUACIONES SIN ENSAMBLAR
-!CCCC----------> LOS NODOS PRESCRITOS
-      
-       CALL GRADCONJ(S,PRESS,F,NNOD*2,CL_CONECTN,NPUNTOSN, &
-     &  IFIXP_NODEN,NFIXP*2,RFIXP_VALUEN,PK,PKB,APK, &
-     &  APKB,RES,RESB)
+!!CCCC----------> RESUELVE EL SISTEMA DE ECUACIONES SIN ENSAMBLAR
+!!CCCC----------> LOS NODOS PRESCRITOS
+!      
+!       CALL GRADCONJ(S,PRESS,F,NNOD*2,CL_CONECTN,NPUNTOSN, &
+!     &  IFIXP_NODEN,NFIXP*2,RFIXP_VALUEN,PK,PKB,APK, &
+!     &  APKB,RES,RESB)
 
 !CCCC----------> RESUELVE EL SISTEMA DE ECUACIONES ENSAMBLANDO
 !CCCC----------> LOS NODOS PRESCRITOS
 
-!      CALL GRADCONJ(S,PRESS,F,NNOD*2,CL_CONECTN,NPUNTOSN &
-!     &  ,IFIXP_NODEN,0,RFIXP_VALUEN,PK,PKB,APK &
-!     &  ,APKB,RES,RESB)
+      CALL GRADCONJ(S,PRESS,F,NNOD*2,CL_CONECTN,NPUNTOSN &
+     &  ,IFIXP_NODEN,0,RFIXP_VALUEN,PK,PKB,APK &
+     &  ,APKB,RES,RESB)
 
        
       OPEN(1,FILE=FILE(1:ILONG)//'2d.res',STATUS='UNKNOWN')
@@ -1164,7 +1163,7 @@
       DO INOD=1,NNOD
 
          CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DESPU,DESPV,RM,DU,DV,1,dmax)
-         WRITE(1,'(I6,2E25.13)') INOD,DESPU,DESPV
+         WRITE(1,'(I6,2E25.12)') INOD,DESPU,DESPV
       END DO
 
 !CCCC----------> IMPRESION DE LOS ESFUERZOS
@@ -1182,236 +1181,235 @@
         ESFY(INOD)=DS3*(POISSON*DUDX+DVDY)
         TAU(INOD)=DS3*(DS1*(DVDX+DUDY))
         
-        WRITE(1,'(I6,3E25.13)') INOD,ESFX(INOD),ESFY(INOD),TAU(INOD)
+        WRITE(1,'(I6,3E25.12)') INOD,ESFX(INOD),ESFY(INOD),TAU(INOD)
         
       END DO
       
       CLOSE(1)
 
-!CCCCC---> TENSIONES (exactas,numericas) en un plano a una distancia 
-!CCCCC     de 12 unidades del borde superior(libre) de la placa
-
-      OPEN(1,FILE=FILE(1:ILONG)//'2d.res-1',STATUS='UNKNOWN')
-
-
-      DO INOD=1,NNOD
-		if (x(inod).eq.12) then
-
-		ESFXEXA(INOD)=-20/3.14159265/12*(cos(atan(y(inod)/12)))**4
-		TAUEXA(INOD)=-20/3.14159265/12*sin(atan(y(inod)/12))*(cos(atan(y(inod)/12)))**3
-        
-		WRITE(1,'(5E16.6)')y(inod),esfxexa(inod),esfx(inod),tauexa(inod),tau(inod)
-		end if
-         
-      END DO
-
-
-      CLOSE(1)
+!!CCCCC---> TENSIONES (exactas,numericas) en un plano a una distancia 
+!!CCCCC     de 12 unidades del borde superior(libre) de la placa
+!
+!      OPEN(1,FILE=FILE(1:ILONG)//'2d.res-1',STATUS='UNKNOWN')
+!
+!
+!      DO INOD=1,NNOD
+!          if (x(inod).eq.12) then
+!          
+!          ESFXEXA(INOD)=-20/3.14159265/12*(cos(atan(y(inod)/12)))**4
+!          TAUEXA(INOD)=-20/3.14159265/12*sin(atan(y(inod)/12))*(cos(atan(y(inod)/12)))**3
+!          
+!          WRITE(1,'(5E25.12)')y(inod),esfxexa(inod),esfx(inod),tauexa(inod),tau(inod)
+!          end if
+!         
+!      END DO
+!
+!
+!      CLOSE(1)
 
 
 !CCCCC-------->  CALCULO DE TENSIONES ALISADAS
-      
-!c      OPEN(1,FILE=FILE(1:ILONG)//'2d.res-2',STATUS='UNKNOWN')
+     
+      OPEN(1,FILE=FILE(1:ILONG)//'2d.res-2',STATUS='UNKNOWN')
 
-!c      WRITE(1,'(A15,I4,I6,3I)') 'residuo-contorno',2,0,3,1,0
+      WRITE(1,'(A15,I4,I6,3I4)') 'residuo-contorno',2,0,3,1,0
 
 !CCCCC-------->  SUAVIZADO DE TENSIONES
-!c      SUM=0.0
-!c	SUM1=0.0
-!c      sum2=0.0
+      SUM=0.0
+      SUM1=0.0
+      sum2=0.0
 
-!c      DO INOD=1,NNOD
+      DO INOD=1,NNOD
 
-!c        CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDX,DVDX,RM,DU,DV,2)
-!c        CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDY,DVDY,RM,DU,DV,3)
+        CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDX,DVDX,RM,DU,DV,2,dmax)
+        CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDY,DVDY,RM,DU,DV,3,dmax)
 
-!c        ESFX(INOD)=DS3*(DUDX+POISSON*DVDY)
-!c        ESFY(INOD)=DS3*(POISSON*DUDX+DVDY)
-!c        TAU(INOD)=DS3*DS1*(DVDX+DUDY)
+        ESFX(INOD)=DS3*(DUDX+POISSON*DVDY)
+        ESFY(INOD)=DS3*(POISSON*DUDX+DVDY)
+        TAU(INOD)=DS3*DS1*(DVDX+DUDY)
 
-!c        CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,ESFXA,RMA,ESFX,1)
-!c        CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,ESFYA,RMA,ESFY,1)
-!c        CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,TAUA,RMA,TAU,1)
+        CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,ESFXA,RMA,ESFX,1)
+        CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,ESFYA,RMA,ESFY,1)
+        CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,TAUA,RMA,TAU,1)
 
-!c        errgl(inod,1)=ESFX(INOD)
-!c        errgl(inod,2)=ESFXA
-!c        errgl(inod,3)=(ESFXA-ESFX(INOD))                               !(TAUA-TAU(INOD))
-!c        SUM=SUM+ERRGL(INOD,1)
-!c        sum2=sum2+dabs(ESFX(INOD))
+        errgl(inod,1)=ESFX(INOD)
+        errgl(inod,2)=ESFXA
+        errgl(inod,3)=(ESFXA-ESFX(INOD))    !(TAUA-TAU(INOD))
+        SUM=SUM+ERRGL(INOD,1)
+        sum2=sum2+dabs(ESFX(INOD))
 
-!c        errgl(inod,1)=((ESFXA-ESFX(INOD))**2+(ESFYA-ESFY(INOD))**2+(2*(TAUA-TAU(INOD))**2))**0.5
+        errgl(inod,1)=((ESFXA-ESFX(INOD))**2+(ESFYA-ESFY(INOD))**2+(2*(TAUA-TAU(INOD))**2))**0.5
 
-!c        WRITE(1,'(I6,3E16.6)') INOD,errgl(inod,1),errgl(inod,2),errgl(inod,3)
+        WRITE(1,'(I6,3E25.12)') INOD,errgl(inod,1),errgl(inod,2),errgl(inod,3)
 
-!c        sum2=sum2+(esfx(inod)**2+esfy(inod)**2+tau(inod)**2)
+        sum2=sum2+(esfx(inod)**2+esfy(inod)**2+tau(inod)**2)
 
-!c      END DO
-      
-!c      sum2=sum2**0.5
-!c      write(*,*) sum2
+      END DO
+     
+      sum2=sum2**0.5
+      write(*,*) sum2
 
-!c      DO INOD=1,NNOD
-!c         ERRGL(INOD,2)=ERRGL(INOD,1)/sum2
-!c         WRITE(1,'(I6,3E16.6)') INOD,errgl(inod,1),errgl(inod,2)
-!c      END DO
+      DO INOD=1,NNOD
+         ERRGL(INOD,2)=ERRGL(INOD,1)/sum2
+         WRITE(1,'(I6,3E25.12)') INOD,errgl(inod,1),errgl(inod,2)
+      END DO
 
-!c      CLOSE(1)
-
-      
-!CCCCC-------> Residuo contorno
-
-!c      DO INOD=1,NNOD
-      
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDX,DVDX,RM,DU,DV,2,dmax)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDY,DVDY,RM,DU,DV,3,dmax)
-
-!c         DU_DX(INOD)=DUDX
-!c         DV_DX(INOD)=DVDX
-!c         DU_DY(INOD)=DUDY
-!c         DV_DY(INOD)=DVDY
-
-!c         CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,DUDXAU,RMA,DU_DX,1)
-!c         CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,DVDXAU,RMA,DV_DX,1)
-!c         CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,DUDYAU,RMA,DU_DY,1)
-!c         CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,DVDYAU,RMA,DV_DY,1)
-
-!c         ESFXAU(INOD)=DS3*(DUDXAU+POISSON*DVDYAU)
-!c         ESFYAU(INOD)=DS3*(POISSON*DUDXAU+DVDYAU)
-!c         TAUAU(INOD)=DS3*DS1*(DVDXAU+DUDYAU)
-        
-!c         WRITE(1,'(I6,3E16.6)') INOD,ESFXAU(INOD),ESFX(INOD)
-
-!c      END DO
-
-      
-!c      DO I=1,NNORM
-!c         INOD=INORM_NODE(I)
-
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDXAU,DVDXAU,RM,DU_DX,DV_DX,1,dmax)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDYAU,DVDYAU,RM,DU_DY,DV_DY,1,dmax)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDX2,D2VDX2,RM,DU_DXAU,DV_DXAU,2,dmax)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDXDY,D2VDXDY,RM,DU_DYAU,DV_DYAU,2,dmax)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDY2,D2VDY2,RM,DU_DYAU,DV_DYAU,3,dmax)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDX2,D2VDX2,RM,DU,DV,4,dmax)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDXDY,D2VDXDY,RM,DU,DV,5,dmax)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDY2,D2VDY2,RM,DU,DV,6,dmax)
-
-!c         CALL H_CARACT(INOD,NNOD,NPUNTOS,CL_CONECT,HCAR,X,Y)
-!c	   AF=1.0
-
-
-!cccc-----> residuo contorno=h/2*(ec.dominio)
-         
-!c         ERRXAU(INOD,1)= ((DUDXAU*RNORM_VALUEX(I))+(DS1*DUDYAU*RNORM_VALUEY(I))+ &
-!c     &             (POISSON*DVDYAU*RNORM_VALUEX(I))+(DS1*DVDXAU*RNORM_VALUEY(I))) 
-!c         ERRXAU(INOD,2)= (DABS(D2UDX2+(DS1*D2UDY2)+(POISSON*D2VDXDY)+(DS1*D2VDXDY)))
-!c	    ERRXAU(INOD,2)= ESFX(INOD)*RNORM_VALUEX(I)+TAU(INOD)*RNORM_VALUEY(I)
-
-
-!c         ERRYAU(INOD,1)= ((POISSON*DUDXAU*RNORM_VALUEY(I))+(DS1*DUDYAU*RNORM_VALUEX(I))+ &
-!c     &             (DVDYAU*RNORM_VALUEY(I))+(DS1*DVDXAU*RNORM_VALUEX(I)))
-         
-!c         ERRYAU(INOD,2)= (DABS((POISSON*D2UDXDY)+(DS1*D2UDXDY)+D2VDY2+(DS1*D2VDX2)))
-!C	    ERRYAU(INOD,2)= ESFY(INOD)*RNORM_VALUEY(I)+TAU(INOD)*RNORM_VALUEX(I)
-
-
-!c         SUM=SUM+(ERRXAU(INOD,2))**2.0+(ERRYAU(INOD,2))**2.0
-!C	   SUM1=SUM1+ERRYAU(INOD,2)
-!C	    IF (X(INOD).EQ.8.0) THEN
-!c         WRITE(1,'(I6,3E16.6)') INOD,ERRXAU(INOD,2),ERRYAU(INOD,2)
-!C         WRITE(1,'(I6,3E16.6)') INOD,((ERRXAU(INOD,2))**2+(ERRYAU(INOD,2))**2)**0.5
-
-!C         END IF
-!c      END DO
-!c
-!c	WRITE(*,*) SUM**0.5
-!C	WRITE(*,*) SUM1
-         
-!c      DO I=1,NNORM
-!c         INOD=INORM_NODE(I)
-
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDX,DVDX,RM,DU,DV,2)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDY,DVDY,RM,DU,DV,3)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDX2,D2VDX2,RM,DU,DV,4)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDXDY,D2VDXDY,RM,DU,DV,5)
-!c         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDY2,D2VDY2,RM,DU,DV,6)
-
-
-!c         ERRX(INOD,1)= (DUDX*RNORM_VALUEX(I)+DS1*DUDY*RNORM_VALUEY(I)+ &
-!c     &             POISSON*DVDY*RNORM_VALUEX(I)+DS1*DVDX*RNORM_VALUEY(I))
-
-!C         ERRX(INOD,2)=(D2UDX2+DS1*D2UDY2+POISSON*D2VDXDY+DS1*D2VDXDY)
-         
-!c         ERRY(INOD,1)= (POISSON*DUDX*RNORM_VALUEY(I)+DS1*DUDY*RNORM_VALUEX(I)+ &
-!c     &             DVDY*RNORM_VALUEY(I)+DS1*DVDX*RNORM_VALUEX(I))
-
-!C         ERRY(INOD,2)=(POISSON*D2UDXDY+DS1*D2UDXDY+D2VDY2+DS1*D2VDX2)
-
-!c      END DO
-
-!c      DO I=1,NFIXF
-!c         INOD=IFIXF_NODE(I)
-
-!c         ERRX(INOD,1)=ERRX(INOD,1)-(RFIXF_VALUEX(I)/DS3)
-!c         ERRY(INOD,1)=ERRY(INOD,1)-(RFIXF_VALUEY(I)/DS3)
-
-!c      END DO
-
-!C      DO I=1,NFIXF
-!C         INOD=IFIXF_NODE(I)
-
-!C         ERRXAU(INOD,1)=ERRXAU(INOD,1)-(RFIXF_VALUEX(I)/DS3)
-!C         ERRYAU(INOD,1)=ERRYAU(INOD,1)-(RFIXF_VALUEY(I)/DS3)
-
-!C      END DO
-
-      
-!c      DO I=1,NNORM
-!c         INOD=INORM_NODE(I)
-!c         CALL H_CARACT(INOD,NNOD,NPUNTOS,CL_CONECT,HCAR,HCARX,HCARY,X,Y)
-!c         AF=1.0
-
-!c         ERRGLAUX(INOD,1)= ERRX(INOD,1)                      !-(AF*HCAR/2*ERRX(INOD,2))
-!c         ERRGLAUY(INOD,1)= ERRY(INOD,1)                      !-(AF*HCAR/2*ERRY(INOD,2))
-
-!C         ERRGLAUX(INOD,2)= ERRXAU(INOD,1)-(AF*HCAR/2*ERRXAU(INOD,2))
-!C         ERRGLAUY(INOD,2)= ERRYAU(INOD,1)-(AF*HCAR/2*ERRYAU(INOD,2))
-
-
-!C         ERRGLAUX= ((ERRXAU(INOD,1)-ERRX(INOD,1))/(ERRXAU(INOD,2)-ERRX(INOD,2)))
-!C         IF (ERRGLAUX.GT.1.0) THEN
-!C            ERRGLAUX=1.0
-!C         END IF
-!C         IF (ERRGLAUX.LT.0.0) THEN
-!C            ERRGLAUX=0.0
-!C         END IF
-         
-         
-!C         ERRGLAUY= ((ERRYAU(INOD,1)-ERRY(INOD,1))/(ERRYAU(INOD,2)-ERRY(INOD,2)))
-!C         IF (ERRGLAUY.GT.1.0) THEN
-!C            ERRGLAUY=1.0
-!C         END IF
-!C         IF (ERRGLAUY.LT.0.0) THEN
-!C            ERRGLAUY=0.0
-!C         END IF
-         
-!C         ERRGL(INOD,1)=  ERRGLAUX(INOD,1)-ERRGLAUX(INOD,2)
-!C         ERRGL(INOD,2)=  ERRGLAUY(INOD,1)-ERRGLAUY(INOD,2)
-
-         
-!c         WRITE(1,'(I6,3E16.6)') INOD,ERRGLAUX(INOD,1),ERRGLAUY(INOD,1)
-         
-!c      END DO
-
-!C      DO I=1,NNORM
-!C         INOD=INORM_NODE(I)
-!C         SUM=SUM+ERRGL(INOD)
-!C      END DO
-      
-!C      SUM=SUM/NNORM
-!C      write(*,*) SUM
-      
       CLOSE(1)
-
-      RETURN
+      
+!!CCCCC-------> Residuo contorno
+!
+!      DO INOD=1,NNOD
+!     
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDX,DVDX,RM,DU,DV,2,dmax)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDY,DVDY,RM,DU,DV,3,dmax)
+!
+!         DU_DX(INOD)=DUDX
+!         DV_DX(INOD)=DVDX
+!         DU_DY(INOD)=DUDY
+!         DV_DY(INOD)=DVDY
+!
+!         CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,DUDXAU,RMA,DU_DX,1)
+!         CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,DVDXAU,RMA,DV_DX,1)
+!         CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,DUDYAU,RMA,DU_DY,1)
+!         CALL EVAESC(INOD,NNOD,NPUNTOS,CL_CONECT,DVDYAU,RMA,DV_DY,1)
+!
+!         ESFXAU(INOD)=DS3*(DUDXAU+POISSON*DVDYAU)
+!         ESFYAU(INOD)=DS3*(POISSON*DUDXAU+DVDYAU)
+!         TAUAU(INOD)=DS3*DS1*(DVDXAU+DUDYAU)
+!       
+!         WRITE(1,'(I6,3E16.6)') INOD,ESFXAU(INOD),ESFX(INOD)
+!
+!      END DO
+!
+!     
+!      DO I=1,NNORM
+!         INOD=INORM_NODE(I)
+!
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDXAU,DVDXAU,RM,DU_DX,DV_DX,1,dmax)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDYAU,DVDYAU,RM,DU_DY,DV_DY,1,dmax)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDX2,D2VDX2,RM,DU_DXAU,DV_DXAU,2,dmax)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDXDY,D2VDXDY,RM,DU_DYAU,DV_DYAU,2,dmax)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDY2,D2VDY2,RM,DU_DYAU,DV_DYAU,3,dmax)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDX2,D2VDX2,RM,DU,DV,4,dmax)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDXDY,D2VDXDY,RM,DU,DV,5,dmax)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDY2,D2VDY2,RM,DU,DV,6,dmax)
+!
+!         CALL H_CARACT(INOD,NNOD,NPUNTOS,CL_CONECT,HCAR,X,Y)
+!         AF=1.0
+!
+!
+!!ccc-----> residuo contorno=h/2*(ec.dominio)
+!       
+!         ERRXAU(INOD,1)= ((DUDXAU*RNORM_VALUEX(I))+(DS1*DUDYAU*RNORM_VALUEY(I))+ &
+!     &             (POISSON*DVDYAU*RNORM_VALUEX(I))+(DS1*DVDXAU*RNORM_VALUEY(I))) 
+!         ERRXAU(INOD,2)= (DABS(D2UDX2+(DS1*D2UDY2)+(POISSON*D2VDXDY)+(DS1*D2VDXDY)))
+!	    ERRXAU(INOD,2)= ESFX(INOD)*RNORM_VALUEX(I)+TAU(INOD)*RNORM_VALUEY(I)
+!
+!
+!         ERRYAU(INOD,1)= ((POISSON*DUDXAU*RNORM_VALUEY(I))+(DS1*DUDYAU*RNORM_VALUEX(I))+ &
+!     &             (DVDYAU*RNORM_VALUEY(I))+(DS1*DVDXAU*RNORM_VALUEX(I)))
+!       
+!         ERRYAU(INOD,2)= (DABS((POISSON*D2UDXDY)+(DS1*D2UDXDY)+D2VDY2+(DS1*D2VDX2)))
+!	    ERRYAU(INOD,2)= ESFY(INOD)*RNORM_VALUEY(I)+TAU(INOD)*RNORM_VALUEX(I)
+!
+!
+!         SUM=SUM+(ERRXAU(INOD,2))**2.0+(ERRYAU(INOD,2))**2.0
+!	   SUM1=SUM1+ERRYAU(INOD,2)
+!	    IF (X(INOD).EQ.8.0) THEN
+!         WRITE(1,'(I6,3E16.6)') INOD,ERRXAU(INOD,2),ERRYAU(INOD,2)
+!         WRITE(1,'(I6,3E16.6)') INOD,((ERRXAU(INOD,2))**2+(ERRYAU(INOD,2))**2)**0.5
+!
+!         END IF
+!      END DO
+!
+!	WRITE(*,*) SUM**0.5
+!	WRITE(*,*) SUM1
+!       
+!      DO I=1,NNORM
+!         INOD=INORM_NODE(I)
+!
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDX,DVDX,RM,DU,DV,2)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,DUDY,DVDY,RM,DU,DV,3)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDX2,D2VDX2,RM,DU,DV,4)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDXDY,D2VDXDY,RM,DU,DV,5)
+!         CALL EVAVECT(INOD,NNOD,NPUNTOS,CL_CONECT,D2UDY2,D2VDY2,RM,DU,DV,6)
+!
+!
+!         ERRX(INOD,1)= (DUDX*RNORM_VALUEX(I)+DS1*DUDY*RNORM_VALUEY(I)+ &
+!     &             POISSON*DVDY*RNORM_VALUEX(I)+DS1*DVDX*RNORM_VALUEY(I))
+!
+!         ERRX(INOD,2)=(D2UDX2+DS1*D2UDY2+POISSON*D2VDXDY+DS1*D2VDXDY)
+!       
+!         ERRY(INOD,1)= (POISSON*DUDX*RNORM_VALUEY(I)+DS1*DUDY*RNORM_VALUEX(I)+ &
+!     &             DVDY*RNORM_VALUEY(I)+DS1*DVDX*RNORM_VALUEX(I))
+!
+!         ERRY(INOD,2)=(POISSON*D2UDXDY+DS1*D2UDXDY+D2VDY2+DS1*D2VDX2)
+!
+!      END DO
+!
+!      DO I=1,NFIXF
+!         INOD=IFIXF_NODE(I)
+!
+!         ERRX(INOD,1)=ERRX(INOD,1)-(RFIXF_VALUEX(I)/DS3)
+!         ERRY(INOD,1)=ERRY(INOD,1)-(RFIXF_VALUEY(I)/DS3)
+!
+!      END DO
+!
+!      DO I=1,NFIXF
+!         INOD=IFIXF_NODE(I)
+!
+!         ERRXAU(INOD,1)=ERRXAU(INOD,1)-(RFIXF_VALUEX(I)/DS3)
+!         ERRYAU(INOD,1)=ERRYAU(INOD,1)-(RFIXF_VALUEY(I)/DS3)
+!
+!      END DO
+!
+!    
+!      DO I=1,NNORM
+!         INOD=INORM_NODE(I)
+!         CALL H_CARACT(INOD,NNOD,NPUNTOS,CL_CONECT,HCAR,HCARX,HCARY,X,Y)
+!         AF=1.0
+!
+!         ERRGLAUX(INOD,1)= ERRX(INOD,1)       !-(AF*HCAR/2*ERRX(INOD,2))
+!         ERRGLAUY(INOD,1)= ERRY(INOD,1)       !-(AF*HCAR/2*ERRY(INOD,2))
+!
+!         ERRGLAUX(INOD,2)= ERRXAU(INOD,1)-(AF*HCAR/2*ERRXAU(INOD,2))
+!         ERRGLAUY(INOD,2)= ERRYAU(INOD,1)-(AF*HCAR/2*ERRYAU(INOD,2))
+!
+!
+!         ERRGLAUX= ((ERRXAU(INOD,1)-ERRX(INOD,1))/(ERRXAU(INOD,2)-ERRX(INOD,2)))
+!         IF (ERRGLAUX.GT.1.0) THEN
+!            ERRGLAUX=1.0
+!         END IF
+!         IF (ERRGLAUX.LT.0.0) THEN
+!            ERRGLAUX=0.0
+!         END IF
+!       
+!       
+!         ERRGLAUY= ((ERRYAU(INOD,1)-ERRY(INOD,1))/(ERRYAU(INOD,2)-ERRY(INOD,2)))
+!         IF (ERRGLAUY.GT.1.0) THEN
+!            ERRGLAUY=1.0
+!         END IF
+!         IF (ERRGLAUY.LT.0.0) THEN
+!            ERRGLAUY=0.0
+!         END IF
+!       
+!         ERRGL(INOD,1)=  ERRGLAUX(INOD,1)-ERRGLAUX(INOD,2)
+!         ERRGL(INOD,2)=  ERRGLAUY(INOD,1)-ERRGLAUY(INOD,2)
+!
+!       
+!         WRITE(1,'(I6,3E16.6)') INOD,ERRGLAUX(INOD,1),ERRGLAUY(INOD,1)
+!       
+!      END DO
+!
+!      DO I=1,NNORM
+!         INOD=INORM_NODE(I)
+!         SUM=SUM+ERRGL(INOD)
+!      END DO
+!    
+!      SUM=SUM/NNORM
+!      write(*,*) SUM
+!      
+!      CLOSE(1)
+!
+!      RETURN
       END
