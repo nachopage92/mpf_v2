@@ -3,7 +3,8 @@ program Finite_Point_Method_Solver
     IMPLICIT NONE
 
     INTEGER,PARAMETER :: MAXCLD = 16  ! numero maximo permitido por nubes
-    INTEGER,PARAMETER :: NCONS = 6   ! [ 1 ; x ; y ; x^2 ; xy ; y^2 ]
+    INTEGER,PARAMETER :: NCONS  = 6   ! [ 1 ; x ; y ; x^2 ; xy ; y^2 ]
+                                      ! phi,dphix,dphiy,ddphixx,ddphixy,ddphiyy
 
     CHARACTER(LEN=100) :: FILENAME
     
@@ -257,8 +258,12 @@ program Finite_Point_Method_Solver
 !--------------> RESUELVE EL SISTEMA DE ECUACIONES ENSAMBLANDO
 !--------------> LOS NODOS PRESCRITOS
 
-    CALL GRADCONJ(S,PRESS,F,NNOD*2,MAXCLD*2,CL_CONECTN &
-    &  ,NPUNTOSN,IFIXP_NODEN,0,RFIXP_VALUEN)
+!    CALL GRADCONJ(S,PRESS,F,NNOD*2,MAXCLD*2,CL_CONECTN &
+!    &  ,NPUNTOSN,IFIXP_NODEN,0,RFIXP_VALUEN)
+
+    CALL BCG2()     !   BICGSTAB_v2
+
+    !CALL UMF()      !   Unsymmetric-pattern MultiFrontal method 
       
     OPEN(1,FILE=TRIM(FILENAME)//'2d.res',STATUS='UNKNOWN')
     
@@ -469,9 +474,9 @@ program Finite_Point_Method_Solver
     END SUBROUTINE PRECF
 
 
-!------------------------------------------------
-!C        REALIZA CAMBIO DE VARIABLES           C 
-!------------------------------------------------
+!-----------------------------------------------!
+!         REALIZA CAMBIO DE VARIABLES           !
+!-----------------------------------------------!
       SUBROUTINE CAMBIOVAR
 
       INTEGER INOD,I,J
@@ -501,9 +506,9 @@ program Finite_Point_Method_Solver
       END SUBROUTINE CAMBIOVAR
 
 
-!-----------------------------------------CCC
-!C    CALCULO DEL H CARACTERISTICO MINIMO   C
-!-----------------------------------------CCC
+!-------------------------------------------!
+!     CALCULO DEL H CARACTERISTICO MINIMO   !
+!-------------------------------------------!
     SUBROUTINE H_CARACT(INOD,HCAR)
     
     INTEGER INOD,J
@@ -533,14 +538,14 @@ program Finite_Point_Method_Solver
     RETURN
     END SUBROUTINE H_CARACT
 
-!-----------------------------------------------
-!C    SOLVER. GRADIENTES BICONJUGADOS PARA     C
-!C    MATRICES NO SIMETRICAS Y NO DEFINIDAS    C
-!C    POSITIVAS                                C
-!C                                             C 
-!C    MATRIZ ALMACENADA EN FILAS               C
-!C                                   15/01/98  C
-!-----------------------------------------------
+!----------------------------------------------!
+!     SOLVER. GRADIENTES BICONJUGADOS PARA     !
+!     MATRICES NO SIMETRICAS Y NO DEFINIDAS    !
+!     POSITIVAS                                !
+!                                              ! 
+!     MATRIZ ALMACENADA EN FILAS               !
+!                                    15/01/98  !
+!----------------------------------------------!
     SUBROUTINE GRADCONJ(S,PRESS,B,NNOD,MAXCLD,CL_CONECT,NPUNTOS, &
      &  IFIX_NODE,NFIX,RFIX_VALUE)
     IMPLICIT NONE
@@ -635,10 +640,10 @@ program Finite_Point_Method_Solver
     RETURN
     END
 
-!-------------------------------------
-!C    FUNCION AUXILIAR DEL SOLVER    C
-!C    CALCULA EL RESIDUO             C      
-!-------------------------------------      
+!------------------------------------!
+!     FUNCION AUXILIAR DEL SOLVER    !
+!     CALCULA EL RESIDUO             !      
+!------------------------------------!      
     PURE SUBROUTINE RESIDUO(RES,S,PRESS,CL_CONECT,NPUNTOS,NNOD,MAXCLD &
     &  ,IFIX_NODE,NFIX,RFIX_VALUE,IFLAG)
     IMPLICIT NONE
@@ -682,9 +687,9 @@ program Finite_Point_Method_Solver
     RETURN
     END
 
-!-----------------------------------------
-!C    FUNCION AUXILIAR [2] DEL SOLVER    C 
-!-----------------------------------------
+!----------------------------------------!
+!     FUNCION AUXILIAR [2] DEL SOLVER    ! 
+!----------------------------------------!
     PURE SUBROUTINE SUBPKBAPK(PKBAPK,APK,PK,NNOD)
     IMPLICIT NONE
     
@@ -702,21 +707,109 @@ program Finite_Point_Method_Solver
     RETURN
     END
 
-!CCCC---------------------------------------------CCCC
-!C    EVALUA UNA FUNCION VECTORIAL Y SUS DERIVADA    C
-!CCCC---------------------------------------------CCCC
+
+!:::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+    subroutine BCG2
+
+        integer, parameter :: l=1
+        logical okprint,nonzero
+        integer mxmv,info,ldw
+        real*8 tol,rhs(NNOD*2),work(NNOD*2,2*l+5)
+        character(3) typestop
+
+        okprint = .true.
+        tol = 1.d-14
+        PRESS = 0.d0  ! initial guess
+        nonzero = .false.
+        typestop = 'max'
+        mxmv = 100000
+        ldw = NNOD*2*(2*l+5) ! o mas grande
+
+! okprint == (input) LOGICAL. If okprint=.true. residual norm
+!            will be printed to *
+! l       == (input) INTEGER BiCGstab's dimension <= 2
+!            Set l=2 for highly nonsymmetric problems
+! n       == (input) INTEGER size of the system to solve 
+! x       == (input/output) DOUBLE PRECISION array dimension n
+!            initial guess on input, solution on output
+! rhs     == (input) DOUBLE PRECISION array dimension n
+!            right-hand side (rhs) vector
+! matvec  == (input) EXTERNAL name of matrix vector subroutine
+!            to deliver y:=A*x by CALL matvec(n,x,y)
+! nonzero == (input) LOGICAL tells
+!            BiCGstab(\ell) if initial guess in x is zero or not. 
+!            If nonzero is .FALSE., one MATVEC call is saved.
+! tol     == (input/output) DOUBLE PRECISION tolerance for all possible
+!            stopping criteria (see the 'typestop' parameter)
+!            On output, if info=0 or 1, tol is actually achieved
+!            residual reduction or whatever (see the 'typestop' parameter)
+! typestop== (input) CHARACTER*3 stopping criterion (||.|| denotes 
+!            the 2-norm):
+!            typestop='rel' -- relative stopping crit.: ||res|| < tol*||res0||
+!            typestop='abs' -- absolute stopping crit.: ||res||<tol
+!            typestop='max' -- maximum  stopping crit.: max(abs(res))<tol
+! NOTE(for typestop='rel' and 'abs'): To save computational work, the value of 
+!            residual norm used to check the convergence inside the main iterative 
+!            loop is computed from 
+!            projections, i.e. it can be smaller than the true residual norm
+!            (it may happen when e.g. the 'matrix-free' approach is used).
+!            Thus, it is possible that the true residual does NOT satisfy
+!            the stopping criterion ('rel' or 'abs').
+!            The true residual norm (or residual reduction) is reported on 
+!            output in parameter TOL -- this can be changed to save 1 MATVEC
+!            (see comments at the end of the subroutine)
+! mxmv   ==  (input/output) INTEGER.  On input: maximum number of matrix 
+!            vector multiplications allowed to be done.  On output: 
+!            actual number of matrix vector multiplications done
+! work   ==  (workspace) DOUBLE PRECISION array dimension (n,2*l+5))
+! ldw    ==  (input) INTEGER size of work, i.e. ldw >= n*(2*l+5)
+! info   ==  (output) INTEGER.  info = 0 in case of normal computations
+!            and 
+!            info = -m (<0) - means paramater number m has an illegal value
+!            info = 1 - means no convergence achieved (stopping criterion
+!            is not fulfilled)
+!            info = 2 - means breakdown of the algorithm (try to enlarge
+!            parameter l=\ell to get rid of this)
+! ----------------------------------------------------------
+        call bicgstab2 (okprint,l,NNOD*2,PRESS,F,matvec,nonzero,tol,&
+                        &typestop,mxmv,work,ldw,info)
+
+        return
+    end subroutine BCG2
+
+    subroutine matvec(n,x,y)
+    !using as EXTERNAL matrix vector subroutine
+    !to deliver y:=A*x by CALL matvec(n,x,y)
+        integer,intent(in) :: n
+        real*8,intent(in)  :: x(n)
+        real*8,intent(out) :: y(n)
+        integer i,j
+        y = 0.d0
+        do i = 1, nnod*2
+            do j=1,npuntosn(i)
+                y(i) = y(i) + S(j,i)*x(CL_CONECTN(j,i))
+            end do
+        end do
+        return
+    end subroutine matvec
+
+
+!----------------------------------------------------!
+!     EVALUA UNA FUNCION VECTORIAL Y SUS DERIVADA    !
+!----------------------------------------------------!
     PURE SUBROUTINE EVAVECT(INOD,VALX,VALY,ITIPE)
     
     INTEGER,INTENT(IN) :: INOD,ITIPE
     REAL*8,INTENT(OUT) :: VALX,VALY
     INTEGER J
 
-!CCCC----------> ITIPE = 1  FUNCION DE FORMA
-!CCCC----------> ITIPE = 2  DERIVADA RESPECTO A X   d /dx
-!CCCC----------> ITIPE = 3  DERIVADA RESPECTO A Y   d /dy
-!CCCC----------> ITIPE = 4  DERIVADA SEGUNDA RESPECTO A  X   d2 /dx2
-!CCCC----------> ITIPE = 5  DERIVADA SEGUNDA RESPECTO A X,Y  d2 /dxdy
-!CCCC----------> ITIPE = 6  DERIVADA SEGUNDA RESPECTO A  Y   d2 /dy2
+!--------------> ITIPE = 1  FUNCION DE FORMA
+!--------------> ITIPE = 2  DERIVADA RESPECTO A X   d /dx
+!--------------> ITIPE = 3  DERIVADA RESPECTO A Y   d /dy
+!--------------> ITIPE = 4  DERIVADA SEGUNDA RESPECTO A  X   d2 /dx2
+!--------------> ITIPE = 5  DERIVADA SEGUNDA RESPECTO A X,Y  d2 /dxdy
+!--------------> ITIPE = 6  DERIVADA SEGUNDA RESPECTO A  Y   d2 /dy2
 
     VALX=0.D0
     VALY=0.D0
@@ -732,9 +825,9 @@ program Finite_Point_Method_Solver
 !:::::::::::::::::::::::::::::::::::::::::::::::::::
 !:::::::::::::::::::::::::::::::::::::::::::::::::::
 
-!-----------------------------------------------------------
-!C    CALCULO DE LAS FUNCIONES DE FORMA Y SUS DERIVADAS    C
-!-----------------------------------------------------------
+!----------------------------------------------------------!
+!     CALCULO DE LAS FUNCIONES DE FORMA Y SUS DERIVADAS    !
+!----------------------------------------------------------!
 
     subroutine N_DN_D2N
         integer i
@@ -746,11 +839,14 @@ program Finite_Point_Method_Solver
                RM(1:NCONS,1:MAXCLD,i) = RM_FWLS(1:NCONS,1:MAXCLD,i) 
             else ! pertenece al interior
                RM(1:NCONS,1:MAXCLD,i) = RM_MaxEnt(1:NCONS,1:MAXCLD,i) 
+               !RM(1:NCONS,1:MAXCLD,i) = RM_FWLS(1:NCONS,1:MAXCLD,i) 
             end if
             !print*, 'inod (nodo estrella) = ',i  ;   print*,'phi:'
             !print*, RM(1,:,i)                    ;   print*, ''
-
         end do
+
+        ! despejar espacio
+        deallocate(RM_FWLS,RM_MaxEnt)
         
         return
     end subroutine N_DN_D2N
@@ -774,7 +870,7 @@ program Finite_Point_Method_Solver
 
         eps    = 1.d-14      ! convergence tolerance 
         dettol = 1.d-16      ! determinant tolerance with default of 10d−16
-        maxit  = 1000        ! maximum number of iteration
+        maxit  = 10000       ! maximum number of iteration
         maxentprint = .true. ! print convergence information
 
         do inod = 1,nnod ! recorre cada nodo estrella del dominio 

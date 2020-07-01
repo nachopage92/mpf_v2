@@ -11,9 +11,10 @@
          - Geomdl       :   B-Spline/NURBS package
          - Matplotlib   :   for plotting
                                                                     
-    Para ejecutar ver archivos run.bat (Windows) o run.sh (Linux)
+    Para ejecutar:
 
-        > run.bat preproceso
+        > run.bat preproceso (Windows)
+        > run.sh preproceso (Linux)
 
     Para obtener informacion acerca de como utilizar este programa
     escribir en terminal:
@@ -21,15 +22,6 @@
         > python3 preproceso.py --help
     
 """                                                              
-
-# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
-def unrecognize_test_error(test):
-    print('Test no registrado, test : ',test)
-    import sys ; sys.exit("Stopped")
-
-# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
 
 class Preprocess_Data_Type():
     """
@@ -222,6 +214,19 @@ class Preprocess_Data_Type():
             ## ----- segun un punto en particular ----- ##
             if ( pt==0 ): # vertice de simetria (0,0)
                 cond = 3  #   -> both_uv_displacement
+        elif (self.test=='patchtest-2'):
+            ## ------ segun lado ------ ##
+            if ( lado == 0 ):   # borde inferior 
+                cond = 2       #   -> only_v_displacement
+            elif ( lado == 1 ): # borde derecho
+                cond = 4       #   -> tau_traction
+            elif ( lado == 2 ): # borde superior 
+                cond = 4       #   -> tau_traction (zero)
+            elif ( lado == 3 ): # borde izquierdo
+                cond = 1       #   -> only_u_displacement
+            ## ----- segun un punto en particular ----- ##
+            if ( pt==0 ): # vertice de simetria (0,0)
+                cond = 3  #   -> both_uv_displacement
         else:
             print('ERROR: Test no registrado')
             from sys import exit; exit('Program stopped')
@@ -237,7 +242,7 @@ class Preprocess_Data_Type():
     def order_boundary_list(self):
         # order list : contiene las id del contorno ordenadas de tal manera
         #              las  primeras  entradas  son  reemplazadas  por  las 
-        #              subsiguientes.  ( ultimas entrdas poseen prioridad )
+        #              subsiguientes.( ultimas entradas poseen prioridad )
         if ( self.test == 'patchtest-0' ):
             #     _III_       
             #    |     |     tanto en I, II, III y IV se preescriben 
@@ -246,6 +251,13 @@ class Preprocess_Data_Type():
             #       I
             priority_order_list = [ 0 , 1 , 2 , 3 ]  # orden irrelevante
         elif ( self.test == 'patchtest-1' ):
+            #     _III_       en I   : preescribe v=0 y dot(sigma,n)_x = 0
+            #    |     |      en II  : preescribe dot(sigma,n) = traction
+            # IV |     | II   en III : preescribe dot(sigma,n) = traction = 0
+            #    |_____|      en IV  : preescribe u=0 y dot(sigma,n)_y = 0
+            #       I
+            priority_order_list = [ 1 , 2 , 0 , 3 ]
+        elif ( self.test == 'patchtest-2' ):
             #     _III_       en I   : preescribe v=0 y dot(sigma,n)_x = 0
             #    |     |      en II  : preescribe dot(sigma,n) = traction
             # IV |     | II   en III : preescribe dot(sigma,n) = traction = 0
@@ -377,7 +389,7 @@ END
             cond,xcoord,xnorm = self.bdry[pts]
             (u,v),(Tx,Ty) = self.rhs[pts]
             if ( cond == 4 ):
-                f.write('{0:5d} {1:5d} {2:5d} {3:20.13f} {4:20.13f}\n'.format(pts,1,0,Tx,Ty))
+                f.write('{0:5d} {1:25.13e} {2:25.13e}\n'.format(pts,Tx,Ty))
 
         # -------------------------
         f.write('{0:<30s}\n'.format('NORMALES'))
@@ -502,7 +514,7 @@ END
                 f.write(formato.format(pts,1,1,u,v))
 
         f.write('FUERZAS\n')
-        formato = '{0:5d} {3:20.13f} {4:20.13f}\n'
+        formato = '{0:5d} {1:20.13f} {2:20.13f}\n'
         for pts in self.bdry.keys():
             cond,xcoord,xnorm = self.bdry[pts]
             if ( cond == 4 ):

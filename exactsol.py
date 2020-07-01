@@ -54,14 +54,20 @@ def SOLUCION_EXACTA(test,x,y,**kwargs):
         return u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
         
     elif (test=='patchtest-2'): # esfuerzo lineal
-        young,poisson = constantes(test)
+        young   = kwargs.get('E',None) # ojo aqui
+        poisson = kwargs.get('v',None) # eventualmente produce error
         u    = x*y/young
         dudx = y/young
         dudy = x/young
         v    = -0.5*(x*x+poisson*y*y)/young
         dvdx = -x/young
         dvdy = -poisson*y/young
+        print(u,dudx,dudy)
+        print(v,dvdx,dvdy)
         epsxx,epsyy,epsxy,sigmax,sigmay,tauxy = strain_stress_calculation()
+        print(v,dvdx,dvdy)
+        print(sigmax,sigmay,tauxy)
+        input()
         return u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
         
     elif (test=='cantilever'): # viga en voladizo
@@ -99,6 +105,7 @@ def SOLUCION_EXACTA(test,x,y,**kwargs):
         print('Error: test no implementado')
         return
 
+
 """
 constantes_geometricas
     Entrega los limites en cada dimension (x,y) del dominio.
@@ -113,8 +120,8 @@ constantes_geometricas
 """
 def constantes_geometricas(test):
     if (test=='patchtest-0') :
-        Lx_i = 0.0 ; Lx_f = 1.0
-        Ly_i = 0.0 ; Ly_f = 1.0
+        Lx_i = 0.0 ; Lx_f = 2.0
+        Ly_i = 0.0 ; Ly_f = 2.0
     if (test=='patchtest-1') :
         Lx_i = 0.0 ; Lx_f = 1.0
         Ly_i = 0.0 ; Ly_f = 1.0
@@ -149,14 +156,6 @@ def constantes(test,**kwargs):
         c = Ly/2.0
         G = 2.0*E/(1.0+v)
         return P,E,v,I,c,G
-    elif ( test == 'local-sources' ):
-        A  = [ 10.00 , 50.00 , 100.0 , 50.00  ]
-        b  = [ 180.0 , 450.0 , 800.0 , 1000.0 ]
-        xi = [ 0.510 , 0.310 , 0.730 , 0.280  ]
-        yi = [ 0.520 , 0.340 , 0.710 , 0.720  ]
-        return A,b,xi,yi
     else:
         print('Test no ingresado!!')
         return
-
-

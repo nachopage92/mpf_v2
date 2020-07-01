@@ -209,8 +209,8 @@ class Meshfree2d_Postproceso_Data():
         # LECTURA DE ESFUERZOS PREESCRITOS
         flist=[] ; tracc=[]
         for i in range(fcond):
-            # 'ALGO' = file_as_list[5+npoin+dcond+i].split()
-            print('PENDIENTE!!')
+            idpt,Tx,Ty = file_as_list[5+npoin+dcond+i].split()
+            flist.append(int(idpt)) ; tracc.append(tuple([float(Tx),float(Ty)]))
         flist=tuple(flist) ; tracc=tuple(tracc)
 
         # LECTURA DE VECTORES NORMALES 
@@ -379,14 +379,14 @@ class Meshfree2d_Postproceso_Data():
         return
 
 
-
     """
          GRAFICAR_SOLUCION_TEST2D_EXACTA
     """
     def GRAFICAR_SOLUCION_EXACTA_TEST2D(self,**kwargs):
 
         # numero de puntos por lado
-        npts=[20,20]
+        npts=[3,3]
+        #npts=[20,20]
 
         # lectura de data
         from nurbs_meshgen import NURBS2D_MESHING
@@ -396,7 +396,20 @@ class Meshfree2d_Postproceso_Data():
         for x,y in physical_pts:
             solucion.append( SOLUCION_EXACTA(self.test,x,y,\
                 E=self.young_modulus,v=self.poisson_coeff) )
+
         u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy = zip(*solucion)
+
+        
+        print('wea')
+        input()
+
+
+        for i in solucion:
+            print(i)
+        input()
+
+
+
         displacement = []
         for aux in zip(u,v):
             displacement.append(aux)

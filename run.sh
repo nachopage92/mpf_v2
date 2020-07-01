@@ -1,8 +1,10 @@
 #!/bin/bash
 
 # parametros generales
-test='patchtest-0'
-npts='3-3'
+all_test='patchtest-0 patchtest-1 patchtest-2'
+all_npts='3-3 5-5 11-11 21-21 31-31 41-41 51-51'
+all_test='patchtest-2'
+all_npts='3-3'
 E='1000.0'
 v='0.3'
 plot='False'
@@ -10,28 +12,101 @@ show='False'
 npmin='9'
 npmax='12'
 
-# preproceso
-args='--func Preproceso --test '$test' --npts '$npts' --young '$E' --poisson '$v
-echo python3 preproceso2d.py $args
-python3 ./preproceso2d.py $args
 
-# generacion de nubes
-args=$test' '$npts' '$show' '$npmin' '$npmax' false Linux'
-echo ./genclouds $args
-./genclouds $args
+# :::::::::::::::::::::::::
 
-# ejecuta test
-input_filename='./DATOS/'$test'_'$npts
-echo $input_filename > NUBESPUNT.DAT
-#./punto
-./punto2
+if [ "$1" == "1" ]; then
+    for test in $all_test; do
+        for npts in $all_npts; do    
+            # preproceso
+            args='--func Preproceso --test '$test' --npts '$npts' --young '$E' --poisson '$v
+            echo python3 preproceso2d.py $args
+            python3 ./preproceso2d.py $args
+        done
+    done
+fi
 
-## graficar solucion exacta
-#python3 postproceso2d.py --func PLOT_SOL_EXACT --test %test% --young %E% --poisson %v%
+if [ "$1" == "2" ]; then
+    for test in $all_test; do
+        for npts in $all_npts; do    
+            # generacion de nubes
+            args=$test' '$npts' '$show' '$npmin' '$npmax' false Linux'
+            echo ./genclouds $args
+            ./genclouds $args
+        done
+    done
+fi
+    
+if [ "$1" == "3" ]; then
+    for test in $all_test; do
+        for npts in $all_npts; do    
+            # ejecuta test
+            input_filename='./DATOS/'$test'_'$npts
+            echo $input_filename > NUBESPUNT.DAT
+            #./punto
+            ./punto2
+        done
+    done
+fi
+    
+if [ "$1" == "4" ]; then
+    for test in $all_test; do
+        for npts in $all_npts; do    
+            # graficar solucion numerica
+            args='--func PLOT_SOL_APROX --test '$test' --npts '$npts
+            echo python3 postproceso2d.py $args
+            python3 postproceso2d.py $args
+        done
+    done
+fi
 
-## graficar solucion numerica
-#python3 postproceso2d.py --func PLOT_SOL_APROX --test $test --npts $npts
+if [ "$1" == "5" ]; then
+    for test in $all_test; do
+        for npts in $all_npts; do    
+            # graficar nubes
+            args='--func PLOT_CLOUD --test '$test' --npts '$npts
+            echo python3 postproceso2d.py $args
+            python3 postproceso2d.py $args
+        done
+    done
+fi
 
-## graficar nubes
-#python3 postproceso2d.py --func PLOT_CLOUD --test %test% --npts %npts%
+if [ "$1" == "6" ]; then
+    for test in $all_test; do
+        # graficar solucion exacta
+        args='--func PLOT_SOL_EXACT --test '$test' --young '$E' --poisson '$v
+        echo python3 postproceso2d.py $args
+        python3 postproceso2d.py $args
+    done
+fi
 
+
+if [ "$1" == "all" ]; then
+    for test in $all_test; do
+        for npts in $all_npts; do    
+    
+            # preproceso
+            args='--func Preproceso --test '$test' --npts '$npts' --young '$E' --poisson '$v
+            echo python3 preproceso2d.py $args
+            python3 ./preproceso2d.py $args
+            
+            # generacion de nubes
+            args=$test' '$npts' '$show' '$npmin' '$npmax' false Linux'
+            echo ./genclouds $args
+            ./genclouds $args
+            
+            # ejecuta test
+            input_filename='./DATOS/'$test'_'$npts
+            echo $input_filename > NUBESPUNT.DAT
+            #./punto
+            ./punto2
+            
+            # graficar solucion numerica
+            python3 postproceso2d.py --func PLOT_SOL_APROX --test $test --npts $npts
+            
+            ## graficar nubes
+            #python3 postproceso2d.py --func PLOT_CLOUD --test %test% --npts %npts%
+        
+        done
+    done
+fi
