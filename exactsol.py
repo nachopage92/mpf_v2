@@ -27,10 +27,10 @@ def SOLUCION_EXACTA(test,x,y,**kwargs):
         return epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
 
     # ''''''''''''''''''''''''''''''''''''''''''
+    young   = kwargs.get('E',None) # ojo aqui
+    poisson = kwargs.get('v',None) # eventualmente produce error
 
     if ( test == 'patchtest-0' ):
-        young   = kwargs.get('E',None) # ojo aqui
-        poisson = kwargs.get('v',None) # eventualmente produce error
         u = x+y
         dudx = 1.0
         dudy = 1.0
@@ -41,8 +41,6 @@ def SOLUCION_EXACTA(test,x,y,**kwargs):
         return u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
 
     elif (test=='patchtest-1'): # esfuerzo uniforme
-        young   = kwargs.get('E',None) # ojo aqui
-        poisson = kwargs.get('v',None) # eventualmente produce error
         aux = x*0.0+1.0 # 'artilugio' para graficar
         u    = x/young
         dudx = 1.0/young * aux
@@ -54,29 +52,26 @@ def SOLUCION_EXACTA(test,x,y,**kwargs):
         return u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
         
     elif (test=='patchtest-2'): # esfuerzo lineal
-        young   = kwargs.get('E',None) # ojo aqui
-        poisson = kwargs.get('v',None) # eventualmente produce error
         u    = x*y/young
         dudx = y/young
         dudy = x/young
         v    = -0.5*(x*x+poisson*y*y)/young
         dvdx = -x/young
         dvdy = -poisson*y/young
-        print(u,dudx,dudy)
-        print(v,dvdx,dvdy)
         epsxx,epsyy,epsxy,sigmax,sigmay,tauxy = strain_stress_calculation()
-        print(v,dvdx,dvdy)
-        print(sigmax,sigmay,tauxy)
-        input()
+        # note: sigma y es identicamente cero, para evitar decimales indeseados
+        sigmay = 0.0
         return u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
         
     elif (test=='cantilever'): # viga en voladizo
-        P,young,poisson,I,c,G = constantes(test)
-        Lx_i,Lx_f,Ly_i,Ly_f = constantes_geometricas(test)
-        Lx = Lx_f-Lx_i ; Ly=Ly_f-Ly_i
-        # una pequena correccion
+        Lx = 8.0   ; Ly = 1.0
+        P = 1000.0 ; I = 1.0*Ly*Ly*Ly/12.0
+        c = Ly/2.0 ; G = 2.0*young/(1.0+poisson)
+        # cambio de variables
         x_ = Lx-x
         y_ = y
+        # -------------------------
+        # solucion analitica:
         u = -P*x_*x_*y_/(2.0*young*I) - poisson*P*y_*y_*y_/(6.0*young*I) + P*y_*y_*y_/(6.0*I*G)\
                 + ( P*Lx
                         *Lx/(2.0*young*I) - P*c*c/(2.0*G*I) ) * y_
@@ -88,74 +83,86 @@ def SOLUCION_EXACTA(test,x,y,**kwargs):
                 + P*Lx*Lx*Lx/(3.0*young*I)
         dvdx = -poisson*P*y_*y_/(2.0*young*I) - P*x_*x_/(2.0*young*I) + P*Lx*Lx/(2.0*young*I)
         dvdy = poisson*P*x_*y_/(young*I)
-        # una pequena correccion
+        # regreso a la variable inicial ----
         v    = - v
         dvdx = - dvdx
         dvdy = - dvdy
+        # ---------------------------------
         
         epsxx,epsyy,epsxy,sigmax,sigmay,tauxy = strain_stress_calculation()
+        # los esfuerzos normales en y son nulos
+        sigmay = 0.0 # para evitar errores numericos:
         return u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
 
     elif (test=='infinite-plate'):
-        print("PENDIENTE") ; from sys import exit ; exit('stop')
-        #epsxx,epsyy,epsxy,sigmax,sigmay,tauxy = strain_stress_calculation()
-        #return u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
+        from numpy import sqrt,power,pi,arccos,arcsin,cos,sin
+        # -------------- contantes ------------------
+        a = 1.0                       # radio del orificio
+        k = (3.-poisson)/(1.+poisson) # kolosov constant
+        G = 0.5*young/(1.+poisson)    # modulo cortante
+        # -------------- coordenadas polares --------
+        r = sqrt( power(x,2) + power(x,2) )
+        if ( x <= 0 ):
+            theta = 0.5*pi
+        if ( y <= 0 ):
+            theta = 0.0
+        else
+            theta = arccos(x/r) # = arcsin(y,r)
+        #-------------------------------------------------------#
+        # se calculan los siguientes elementos infinitesimales: #
+        #   du/dtheta ; du/dradius     dtheta/dx ; drradius/dx  #
+        #   dv/dtheta ; dv/dradius     dtheta/dy ; drradius/dy  #  
+        # se realiza la siguiente operacion                     # 
+        #          __                            __             #
+        #   u,x    |   u,t    u,r      0      0   |  t,x        #  
+        #   v,x  = |   v,t    v,r      0      0   |  r,x        #    
+        #   u,y    |    0      0      u,t    u,r  |  t,y        #    
+        #   v,y    |_   0      0      v,t    v,r _|  r,y        #     
+        #                                                       #   
+        # o bien, si definimos la submatriz M, pvecx, pvecy,    #    
+        # uvecx, uvecy como:                                    #    
+        #                                                       #      
+        #  M = | u,t  u,r | ; pvecx = | t,x | ; pvecy = | t,y | #
+        #      | v,t  v,r |           | r,x |           | r,y | #
+        #                                                       #
+        #  uvecx = | u,x | ; uvecy = | u,y |                    #
+        #          | v,x |           | v,y |                    #     
+        #                                                       #       
+        # entonces:                                             #           
+        #                uvecx = matmul( M , pvecx )            #   
+        #                uvecy = matmul( M , pvecy )            #   
+        #                                                       #
+        # los terminos dtdx,dtdy,drdx,drdy se determinar indi-  #
+        # rectamente calculada la matrix inversa:               #       
+        #                                                       #
+        #  | x,t   y,t |  =  | t,x  t,y |                       #
+        #  | x,r   y,r |     | r,x  r,y |                       #
+        #-------------------------------------------------------#
+        f1 = (10.*a)/(8.*G)
+        f2 = (r/a)*(k+1.)
+        f3 = 2.*a/r
+        f4 = (1.+k)
+        f5 = 2.*power(a,3)/power(r,3)
+
+        u = f1*( f2*cos(theta) + f3*(f4*cos(theta)+cos(3.*theta)) - f5*cos(3.*theta) ) 
+        v = f1*( f2*sin(theta) + f3*(f4*sin(theta)+sin(3.*theta)) - f5*sin(3.*theta) ) 
+
+        dvdt = f1*( -f2*sin(theta) - f3*(f4*sin(theta)+3.*sin(3.*theta)) + 3.*f5*sin(3.*theta) ) 
+        dudt = f1*( f2*cos(theta) + f3*(f4*cos(theta)+3.*cos(3.*theta)) - 3.*f5*cos(3.*theta) ) 
+
+        f1 = (10.*a)/(8.*G)
+        f2 = (1/a)*(k+1.)
+        f3 = 2.*a/power(r,2)
+        f4 = (1.+k)
+        f5 = 6.*power(a,3)/power(r,4)
+
+        dudr = f1*( f2*cos(theta) + f3*(f4*cos(theta)+cos(3.*theta)) - f5*cos(3.*theta) ) 
+        dvdr = f1*( f2*sin(theta) + f3*(f4*sin(theta)+sin(3.*theta)) - f5*sin(3.*theta) ) 
     
+
+
     else:
         print('Error: test no implementado')
         return
 
 
-"""
-constantes_geometricas
-    Entrega los limites en cada dimension (x,y) del dominio.
-    Supone dominio rectangular. Para el caso 'meshgen = nurbs'
-    los limites corresponderan al espacio parametrico (xi,eta)
-    con valores predeterminados (Lx_i=0;Lx_f=1;Ly_i=0;Ly_f=1)
-    Lx_i : limite izquierdo direccion x         ______        
-    Lx_f : limite derecho direccion x          | Ly_f |       
-    Ly_i : limite inferior direccion y     Lx_i|      |Lx_f   
-    Ly_f : limite superior direccion y         |______|       
-                                                 Ly_i       
-"""
-def constantes_geometricas(test):
-    if (test=='patchtest-0') :
-        Lx_i = 0.0 ; Lx_f = 2.0
-        Ly_i = 0.0 ; Ly_f = 2.0
-    if (test=='patchtest-1') :
-        Lx_i = 0.0 ; Lx_f = 1.0
-        Ly_i = 0.0 ; Ly_f = 1.0
-    elif (test=='patchtest-2') :
-        Lx_i = 0.0 ; Lx_f = 1.0
-        Ly_i = 0.0 ; Ly_f = 1.0
-    elif (test=='cantilever') :
-        Lx_i = 0.0 ; Lx_f = 8.0
-        Ly_i = -0.5 ; Ly_f = 0.5
-    else:
-        print('Test no ingresado')
-        from sys import exit ; exit('Stopped')
-    return Lx_i,Lx_f,Ly_i,Ly_f
-
-
-"""
-    MAS CONSTANTES
-"""
-def constantes(test,**kwargs):
-    if ( test == 'patchtest-0' or\
-         test == 'patchtest-1' or\
-         test == 'patchtest-2' ):
-        return self.young_modulus, self.poisson_coeff
-    elif ( test == 'cantilever' ):
-        Lx_i,Lx_f,Ly_i,Ly_f = constantes_geometricas(test)
-        Lx=Lx_f-Lx_f ; Ly=Ly_f-Ly_i 
-        young = self.young_modulus
-        poisson = self.poisson_coeff
-        P = 1.0
-        #P = 1000.0
-        I = 1.0*Ly*Ly*Ly/12.0
-        c = Ly/2.0
-        G = 2.0*E/(1.0+v)
-        return P,E,v,I,c,G
-    else:
-        print('Test no ingresado!!')
-        return

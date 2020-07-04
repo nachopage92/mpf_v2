@@ -3,7 +3,8 @@
     ... PREPROCESADOR PARA SOLVER MPF 2D ...
 
      # test disponibles:                                            
-     tests = ['patchtest-0','patchest-1','patchtest-2','infinite-plate']
+     tests = ['patchtest-0','patchest-1','patchtest-2',\
+                'cantilever','infinite-plate']
 
      Requiere los siguientes paquetes:  
          - Numpy        :   useful math package
@@ -57,7 +58,7 @@ class Preprocess_Data_Type():
 
         # directorios de salida
         self.data_dir = "./DATOS/"
-        self.plot_dir = "./GRAFICOS/"
+        self.plot_dir = "./GRAFICOS/PREPROCESO/"
 
     """
         DISCRETIZACION DEL DOMINIO
@@ -66,7 +67,14 @@ class Preprocess_Data_Type():
         #       discretizacion regular utilizando algoritmo simple aplicado
         #       al dominio parametrico NURBS. 
         from nurbs_meshgen import NURBS2D_MESHING
-        self.coord,self.tri,self.bdry = NURBS2D_MESHING(self.test,self.nptside,plot=False)
+
+        edge_tol = 1e-12
+        subs = [[],[],[],[]]
+        if ( self.test == 'infinite-plate' ):
+            subs = [[],[0.5],[],[]]
+
+        self.coord,self.tri,self.bdry = NURBS2D_MESHING(self.test,self.nptside,\
+            subs=subs,edge_tol=edge_tol,plot=False)
         # rescato los elementos del contorno en una variable aparte
         # OBS: self.bdry se actualiza mas adelante!
         self.bdry_elem = self.bdry[-1]
@@ -79,11 +87,13 @@ class Preprocess_Data_Type():
         cada test posee condiciones de contorno propias 
     """
     def PREESCRIPCION_CONDICIONES_CONTORNO(self):
+        from bdrycond import order_boundary_list,boundary_condition_assignment
+
         import numpy as np
         
         # revisar 'order_boundary_list' para mas informacion sobre
         # esta funcion y sobre el significado de 'order_list'
-        condition_order_list=self.order_boundary_list()
+        condition_order_list=order_boundary_list(self.test)
 
         # 1. Desempaquetar informacion de variable 'self.bdry'
         bdry_coord,bdry_normal = zip(*self.bdry[0])
@@ -174,7 +184,7 @@ class Preprocess_Data_Type():
             for i in range(colloc_l2[pos]+1,size+colloc_l2[pos]+1):
                 # asignacion de las condiciones de contorno
                 bdry_condition[perm[colloc_l1[i]]] = \
-                    self.boundary_condition_assignment(pos,colloc_l1[i])
+                    boundary_condition_assignment(self.test,pos,colloc_l1[i])
                 # asignacion de las normales
                 if ( colloc_l1[i] in vrtx_normal.keys() ):
                     normal_outward[perm[colloc_l1[i]]] = vrtx_normal[colloc_l1[i]]
@@ -191,84 +201,6 @@ class Preprocess_Data_Type():
 
         return
             
-    """
-    FUNCION AUXLIAR 1: 'set_bdry_condition'
-      outputs: 
-          - cond,  condicion de contorno asociado a cada
-                   segun tabla de arriba (cond=1,2,3 o 4)
-    """
-    def boundary_condition_assignment(self,lado,pt):
-
-        if (self.test=='patchtest-0'):
-            cond = 3       # only uv-displacement condition
-        elif (self.test=='patchtest-1'):
-            ## ------ segun lado ------ ##
-            if ( lado == 0 ):   # borde inferior 
-                cond = 2       #   -> only_v_displacement
-            elif ( lado == 1 ): # borde derecho
-                cond = 4       #   -> tau_traction
-            elif ( lado == 2 ): # borde superior 
-                cond = 4       #   -> tau_traction (zero)
-            elif ( lado == 3 ): # borde izquierdo
-                cond = 1       #   -> only_u_displacement
-            ## ----- segun un punto en particular ----- ##
-            if ( pt==0 ): # vertice de simetria (0,0)
-                cond = 3  #   -> both_uv_displacement
-        elif (self.test=='patchtest-2'):
-            ## ------ segun lado ------ ##
-            if ( lado == 0 ):   # borde inferior 
-                cond = 2       #   -> only_v_displacement
-            elif ( lado == 1 ): # borde derecho
-                cond = 4       #   -> tau_traction
-            elif ( lado == 2 ): # borde superior 
-                cond = 4       #   -> tau_traction (zero)
-            elif ( lado == 3 ): # borde izquierdo
-                cond = 1       #   -> only_u_displacement
-            ## ----- segun un punto en particular ----- ##
-            if ( pt==0 ): # vertice de simetria (0,0)
-                cond = 3  #   -> both_uv_displacement
-        else:
-            print('ERROR: Test no registrado')
-            from sys import exit; exit('Program stopped')
-
-        return cond
-
-    """
-    FUNCION AUXLIAR 2: 'set_bdry_condition'
-      outputs: 
-          - cond,  condicion de contorno asociado a cada
-                   segun tabla de arriba (cond=1,2,3 o 4)
-    """
-    def order_boundary_list(self):
-        # order list : contiene las id del contorno ordenadas de tal manera
-        #              las  primeras  entradas  son  reemplazadas  por  las 
-        #              subsiguientes.( ultimas entradas poseen prioridad )
-        if ( self.test == 'patchtest-0' ):
-            #     _III_       
-            #    |     |     tanto en I, II, III y IV se preescriben 
-            # IV |     | II  desplazamientos en direccion x e y (u y v)
-            #    |_____|      
-            #       I
-            priority_order_list = [ 0 , 1 , 2 , 3 ]  # orden irrelevante
-        elif ( self.test == 'patchtest-1' ):
-            #     _III_       en I   : preescribe v=0 y dot(sigma,n)_x = 0
-            #    |     |      en II  : preescribe dot(sigma,n) = traction
-            # IV |     | II   en III : preescribe dot(sigma,n) = traction = 0
-            #    |_____|      en IV  : preescribe u=0 y dot(sigma,n)_y = 0
-            #       I
-            priority_order_list = [ 1 , 2 , 0 , 3 ]
-        elif ( self.test == 'patchtest-2' ):
-            #     _III_       en I   : preescribe v=0 y dot(sigma,n)_x = 0
-            #    |     |      en II  : preescribe dot(sigma,n) = traction
-            # IV |     | II   en III : preescribe dot(sigma,n) = traction = 0
-            #    |_____|      en IV  : preescribe u=0 y dot(sigma,n)_y = 0
-            #       I
-            priority_order_list = [ 1 , 2 , 0 , 3 ]
-        else:
-            print('ERROR, test no ingresado')
-            from sys import exit ; exit('Program stopped')
-
-        return priority_order_list
     
     """
     GENERAR_RHS
@@ -305,42 +237,6 @@ class Preprocess_Data_Type():
 
     """
         EXPORTAR_DATA
-
-    ejemplo de archivo generado: "test-name.dat"
-
-   NODOS  D.PRESCRITOS F.PRESCRITAS 
-     9         8         0
- PUNTOS     COORDENADAS
-     1  0.000000E+00  0.000000E+00
-     2  0.100000E+01  0.000000E+00
-     3  0.000000E+00  0.100000E+01
-     4  0.100000E+01  0.100000E+01
-     5  0.200000E+01  0.000000E+00
-     6  0.000000E+00  0.200000E+01
-     7  0.100000E+01  0.200000E+01
-     8  0.200000E+01  0.100000E+01
-     9  0.200000E+01  0.200000E+01
- DESPLAZAMIENTO PRESCRITO
-     1     1     1  0.000000E+00  0.000000E+00
-     2     1     1  0.100000E+01  0.100000E+01
-     3     1     1  0.100000E+01  0.100000E+01
-     5     1     1  0.200000E+01  0.200000E+01
-     6     1     1  0.200000E+01  0.200000E+01
-     7     1     1  0.300000E+01  0.300000E+01
-     8     1     1  0.300000E+01  0.300000E+01
-     9     1     1  0.400000E+01  0.400000E+01
- FUERZAS PRESCRITAS
- NORMALES
-     8
-     1 -0.707107E+00 -0.707107E+00
-     2  0.000000E+00 -0.100000E+01
-     3 -0.100000E+01  0.000000E+00
-     5  0.707107E+00 -0.707107E+00
-     6 -0.707107E+00  0.707107E+00
-     7  0.000000E+00  0.100000E+01
-     8  0.100000E+01  0.000000E+00
-     9  0.707107E+00  0.707107E+00
-END
     """
     def EXPORTAR_DATA(self):
         # --- crea carpeta si es que no existe ---
@@ -357,7 +253,7 @@ END
         for i in self.bdry.keys():
             cond_list.append(self.bdry[i][0])
         n_dprescrt = cond_list.count(1)+cond_list.count(2)+cond_list.count(3)
-        n_fprescrt = cond_list.count(4)
+        n_fprescrt = cond_list.count(1)+cond_list.count(2)+cond_list.count(4)
 
         # -------------------------
         f.write('{0:>10s} {1:>15s} {2:>15s}\n'.format('NODOS','D.PRESCRITOS','F.PRESCRITAS'))
@@ -388,7 +284,7 @@ END
             # extraer data
             cond,xcoord,xnorm = self.bdry[pts]
             (u,v),(Tx,Ty) = self.rhs[pts]
-            if ( cond == 4 ):
+            if ( cond == 1 or cond == 2 or cond == 4 ):
                 f.write('{0:5d} {1:25.13e} {2:25.13e}\n'.format(pts,Tx,Ty))
 
         # -------------------------
@@ -620,10 +516,10 @@ END
         if ( not os.path.isdir(self.plot_dir) ):
                 os.mkdir(self.plot_dir)
 
-        # aqui hay un error
-        export_file = self.plot_dir+self.test+self.formato
-        fig.savefig(export_file)
-        print('Figura exportada: '+export_file)
+        if (self.plot):
+            export_file = self.plot_dir+self.test+self.formato
+            fig.savefig(export_file)
+            print('Figura exportada: '+export_file)
 
         if (self.show):
             plt.show()
@@ -692,9 +588,12 @@ meshfree_test2d_collocation_data.EXPORTAR_ELEMENTOS()
 #   8.    exportar datos de entrada para el2pt.f90
 meshfree_test2d_collocation_data.EXPORTAR_el2pt()
 #   8.  Plotear data (opcional)
-if (args.plot!=None):
-    if (args.plot.lower()=="true"):
-        meshfree_test2d_collocation_data.PLOT_PREPROCESS_RESULTS()
+if (args.plot==None):
+    args.plot=''
+if (args.show==None):
+    args.show=''
+if ( args.plot.lower()=="true" or args.show.lower()=="true" ):
+    meshfree_test2d_collocation_data.PLOT_PREPROCESS_RESULTS()
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

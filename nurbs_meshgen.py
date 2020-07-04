@@ -90,6 +90,10 @@ def NURBS2D_MESHING(test,npts,**kwargs):
     ## Evaluate surface
     #surf.evaluate()
 
+    # Informacion de los contornos
+    subs = kwargs.get('subs',[[],[],[],[]])
+    tol  = kwargs.get('edge_tol',1.0e-12)
+
     #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::.
 
     # COLLOCATION & SOURCE PTS IN PARAMETRIC SPACE
@@ -150,13 +154,73 @@ def NURBS2D_MESHING(test,npts,**kwargs):
     #               b.1) se determinan los puntos de control del contorno
     ctrlpts_l1,ctrlpts_l2 = \
     create_matrix_outline(surf.ctrlpts_size_u,surf.ctrlpts_size_v)
-    
-    #               b.2) loop sobre cada punto del contorno en sentido antihorario
-    contador = -1
-    normal_list1 = [] ; normal_list2 = [ contador ]
-    for pos in range(4): # recorre cada lado
 
-        ctrlpts_list = ctrlpts_l1[ ctrlpts_l2[pos]+1 : ctrlpts_l2[pos+1]+1 ]
+    types=[] ; newsubs=[]
+    for pos in range(4):
+        # se extrae puntos de la lista encadenada
+        ptslist = colloc_l1[colloc_l2[pos]+1:colloc_l2[pos+1]+1]
+
+        if ( pos == 0 ) : # lado inferior
+            colloc_knots = collocation_uknots
+        elif ( pos == 1 ):   # lado derecho
+            colloc_knots = collocation_vknots
+        elif ( pos == 2 ) : # lado superior
+            colloc_knots = list(collocation_uknots)
+            colloc_knots.reverse()
+            colloc_knots = np.array(colloc_knots)
+        elif ( pos == 3 ):   # lado izquierdo
+            colloc_knots = list(collocation_vknots)
+            colloc_knots.reverse()
+            colloc_knots = np.array(colloc_knots)
+
+        bdrynum = len(subs[pos])+1 # +1 por cada nuevo punto xi
+        newbdry1=[] ; newbdry2=[] ; aux=[]
+        cbdry = 0   ; new_elem=0
+        types.append(pos) ; newsubs.append(subs[pos])
+
+        # se verifica si existen subcontornos
+        for idpt,xipt in zip(ptslist,colloc_knots):
+            aux.append(idpt) ; cbdry+=1 
+            for jpt in subs[pos]:
+                if ( jpt == xipt ) :
+                    new_elem +=1
+                    newbdry1.append(aux)
+                    newbdry2.append(cbdry)
+                    aux = [idpt] ; cbdry+=1
+                    types.append(pos) ; newsubs.append(subs[pos])
+        newbdry1.append(aux)
+        newbdry2.append(cbdry)
+        new_colloc_l2 = [ colloc_l2[pos] ]
+
+        for i in newbdry2:
+            new_colloc_l2.append( colloc_l2[pos]+i )
+        new_colloc_l1 = [ ]
+        for xp in newbdry1:
+            new_colloc_l1.extend( xp )
+
+        # actualizacion de las listas encadenadas
+        part1 = colloc_l1[:colloc_l2[pos]+1]
+        part1.extend(new_colloc_l1)
+        part1.extend(colloc_l1[colloc_l2[pos+1]+1:])
+        colloc_l1 = part1
+
+        part2 = colloc_l2[:pos]
+        part2.extend(new_colloc_l2)
+        aux = []
+        for i in colloc_l2[pos+2:]:
+            aux.append(i+new_elem*2)
+        part2.extend(aux)
+        colloc_l2 = part2
+
+
+    # --------- end for ---------------
+
+    #               b.2) loop sobre cada punto del contorno en sentido antihorario
+    contador = -1 ; nsides = len(colloc_l2) ; subs = newsubs ; ind = 1
+    normal_list1 = [] ; normal_list2 = [ contador ] 
+    for pos in range(nsides-1): # recorre cada lado
+
+        ctrlpts_list = ctrlpts_l1[ctrlpts_l2[types[pos]]+1:ctrlpts_l2[types[pos]+1]+1]
         #       TENER EN CONSIDERACION: LOS VERTICES SE REPITEN! 
         #       lado-1 : v1._____.v2 (v1 contabilizado dos veces)  
         #       lado-2 : v2._____.v3 (v2 contabilizado dos veces)  
@@ -188,14 +252,26 @@ def NURBS2D_MESHING(test,npts,**kwargs):
         # |____________________________________________|
 
         #  --- algunas modificaciones segun  ---
-        if ( pos == 1 or pos == 3 ):   # lado izquierdo y derecho
-            degree = surf.degree_v
-            knots = surf.knotvector_v
-            colloc_knots = collocation_vknots
-        elif ( pos == 0 or pos == 2) : # lado inferior y superior
+        if ( types[pos] == 0 ) : # lado inferior
             degree = surf.degree_u
             knots = surf.knotvector_u
             colloc_knots = collocation_uknots
+        elif ( types[pos] == 1 ):   # lado derecho
+            degree = surf.degree_v
+            knots = surf.knotvector_v
+            colloc_knots = collocation_vknots
+        elif ( types[pos] == 2 ) : # lado superior
+            degree = surf.degree_u
+            knots = surf.knotvector_u
+            colloc_knots = list(collocation_uknots)
+            colloc_knots.reverse()
+            colloc_knots = np.array(colloc_knots)
+        elif ( types[pos] == 3 ):   # lado izquierdo
+            degree = surf.degree_v
+            knots = surf.knotvector_v
+            colloc_knots = list(collocation_vknots)
+            colloc_knots.reverse()
+            colloc_knots = np.array(colloc_knots)
         else:
             from sys import exit
             exit('ERROR: contorno no identificado')
@@ -205,10 +281,21 @@ def NURBS2D_MESHING(test,npts,**kwargs):
         curve.degree = degree
         curve.ctrlptsw = ctrlptsw
         curve.knotvector = knots 
-        
+        ptslist = colloc_l1[colloc_l2[pos]+1:colloc_l2[pos+1]+1]
+
         # se recorre cada punto de colocacion del contorno
-        for xipt in colloc_knots:
-            normal_list1.append( curve.normal(xipt,normalize=True) )
+        for idpt,xipt in zip(ptslist,colloc_knots):
+            xipt_ = xipt
+            for jpt in subs[pos]:
+                if ( jpt == xipt ) :
+                    if ( jpt == 0.0 ) : 
+                        xipt_ = xipt + tol 
+                    elif ( jpt == 1.0 ) : 
+                        xipt_ = xipt - tol
+                    else :
+                        ind += 1
+                        xipt_ = xipt - tol*pow(-1.0,ind)
+            normal_list1.append( curve.normal(xipt_,normalize=True) )
             # OBS: normal_list2 = colloc_l2
             contador += 1
             # x =  mapping_from_parametrical_to_physical_coordinates_1d(xipt,curve)

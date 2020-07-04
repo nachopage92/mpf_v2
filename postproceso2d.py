@@ -385,8 +385,7 @@ class Meshfree2d_Postproceso_Data():
     def GRAFICAR_SOLUCION_EXACTA_TEST2D(self,**kwargs):
 
         # numero de puntos por lado
-        npts=[3,3]
-        #npts=[20,20]
+        npts=[20,20]
 
         # lectura de data
         from nurbs_meshgen import NURBS2D_MESHING
@@ -398,17 +397,6 @@ class Meshfree2d_Postproceso_Data():
                 E=self.young_modulus,v=self.poisson_coeff) )
 
         u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy = zip(*solucion)
-
-        
-        print('wea')
-        input()
-
-
-        for i in solucion:
-            print(i)
-        input()
-
-
 
         displacement = []
         for aux in zip(u,v):
@@ -739,7 +727,7 @@ def PLOT_DISPLACEMENT(titulo,colloc_pts,displ_sol,filename,is_latex,show):
     # grafico 4
     ax4.set_ylabel(r'$y$')
     ax4.set_xlabel(r'$x$')
-    ax4.plot_trisurf(x,y,u)
+    ax4.plot_trisurf(x,y,v)
     ax4.xaxis.set_major_locator(plt.MaxNLocator(3))
 
     # exportar grafico como archivo
