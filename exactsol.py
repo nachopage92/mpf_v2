@@ -95,71 +95,118 @@ def SOLUCION_EXACTA(test,x,y,**kwargs):
         return u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
 
     elif (test=='infinite-plate'):
-        from numpy import sqrt,power,pi,arccos,arcsin,cos,sin
-        # -------------- contantes ------------------
-        a = 1.0                       # radio del orificio
-        k = (3.-poisson)/(1.+poisson) # kolosov constant
-        G = 0.5*young/(1.+poisson)    # modulo cortante
-        # -------------- coordenadas polares --------
-        r = sqrt( power(x,2) + power(x,2) )
-        if ( x <= 0 ):
-            theta = 0.5*pi
-        if ( y <= 0 ):
-            theta = 0.0
-        else
-            theta = arccos(x/r) # = arcsin(y,r)
-        #-------------------------------------------------------#
-        # se calculan los siguientes elementos infinitesimales: #
-        #   du/dtheta ; du/dradius     dtheta/dx ; drradius/dx  #
-        #   dv/dtheta ; dv/dradius     dtheta/dy ; drradius/dy  #  
-        # se realiza la siguiente operacion                     # 
-        #          __                            __             #
-        #   u,x    |   u,t    u,r      0      0   |  t,x        #  
-        #   v,x  = |   v,t    v,r      0      0   |  r,x        #    
-        #   u,y    |    0      0      u,t    u,r  |  t,y        #    
-        #   v,y    |_   0      0      v,t    v,r _|  r,y        #     
-        #                                                       #   
-        # o bien, si definimos la submatriz M, pvecx, pvecy,    #    
-        # uvecx, uvecy como:                                    #    
-        #                                                       #      
-        #  M = | u,t  u,r | ; pvecx = | t,x | ; pvecy = | t,y | #
-        #      | v,t  v,r |           | r,x |           | r,y | #
-        #                                                       #
-        #  uvecx = | u,x | ; uvecy = | u,y |                    #
-        #          | v,x |           | v,y |                    #     
-        #                                                       #       
-        # entonces:                                             #           
-        #                uvecx = matmul( M , pvecx )            #   
-        #                uvecy = matmul( M , pvecy )            #   
-        #                                                       #
-        # los terminos dtdx,dtdy,drdx,drdy se determinar indi-  #
-        # rectamente calculada la matrix inversa:               #       
-        #                                                       #
-        #  | x,t   y,t |  =  | t,x  t,y |                       #
-        #  | x,r   y,r |     | r,x  r,y |                       #
-        #-------------------------------------------------------#
-        f1 = (10.*a)/(8.*G)
-        f2 = (r/a)*(k+1.)
-        f3 = 2.*a/r
-        f4 = (1.+k)
-        f5 = 2.*power(a,3)/power(r,3)
 
-        u = f1*( f2*cos(theta) + f3*(f4*cos(theta)+cos(3.*theta)) - f5*cos(3.*theta) ) 
-        v = f1*( f2*sin(theta) + f3*(f4*sin(theta)+sin(3.*theta)) - f5*sin(3.*theta) ) 
-
-        dvdt = f1*( -f2*sin(theta) - f3*(f4*sin(theta)+3.*sin(3.*theta)) + 3.*f5*sin(3.*theta) ) 
-        dudt = f1*( f2*cos(theta) + f3*(f4*cos(theta)+3.*cos(3.*theta)) - 3.*f5*cos(3.*theta) ) 
-
-        f1 = (10.*a)/(8.*G)
-        f2 = (1/a)*(k+1.)
-        f3 = 2.*a/power(r,2)
-        f4 = (1.+k)
-        f5 = 6.*power(a,3)/power(r,4)
-
-        dudr = f1*( f2*cos(theta) + f3*(f4*cos(theta)+cos(3.*theta)) - f5*cos(3.*theta) ) 
-        dvdr = f1*( f2*sin(theta) + f3*(f4*sin(theta)+sin(3.*theta)) - f5*sin(3.*theta) ) 
+        # ----------------------------------------------------------
     
+        #   QUEDA PENDIENTE ESTUDIO DE LA SOLUCION ANALITICA PARA
+        #   DESPLAZAMIENTOS Y ESFUERZOS:
+        #   
+        #   NOTA : ECUACION DE MICHELL (1988)
+        #   GRAD^2 GRAD^2 F = 0  aplicado al problema de elasticidad
+        #   lineal    
 
+        from numpy import sqrt,power,pi,arccos,arcsin,cos,sin,array
+        from numpy.linalg import inv
+
+        ## -------------- contantes ------------------
+        #a = 1.0                       # radio del orificio
+        #k = (3.-poisson)/(1.+poisson) # kolosov constant
+        #G = 0.5*young/(1.+poisson)    # modulo cortante
+        ## -------------- coordenadas polares --------
+        #r = sqrt( power(x,2) + power(x,2) )
+        #if ( x <= 0 ):
+        #    theta = 0.5*pi
+        #if ( y <= 0 ):
+        #    theta = 0.0
+        #else:
+        #    theta = arccos(x/r) # = arcsin(y,r)
+        ##-------------------------------------------------------#
+        ## se calculan los siguientes elementos infinitesimales: #
+        ##   du/dtheta ; du/dradius     dtheta/dx ; drradius/dx  #
+        ##   dv/dtheta ; dv/dradius     dtheta/dy ; drradius/dy  #  
+        ## se realiza la siguiente operacion                     # 
+        ##          __                            __             #
+        ##   u,x    |   u,t    u,r      0      0   |  t,x        #  
+        ##   v,x  = |   v,t    v,r      0      0   |  r,x        #    
+        ##   u,y    |    0      0      u,t    u,r  |  t,y        #    
+        ##   v,y    |_   0      0      v,t    v,r _|  r,y        #     
+        ##                                                       #   
+        ## o bien, si definimos la submatriz M, pvecx, pvecy,    #    
+        ## uvecx, uvecy como:                                    #    
+        ##                                                       #      
+        ##  M = | u,t  u,r | ; pvecx = | t,x | ; pvecy = | t,y | #
+        ##      | v,t  v,r |           | r,x |           | r,y | #
+        ##                                                       #
+        ##  uvecx = | u,x | ; uvecy = | u,y |                    #
+        ##          | v,x |           | v,y |                    #     
+        ##                                                       #       
+        ## entonces:                                             #           
+        ##                uvecx = matmul( M , pvecx )            #   
+        ##                uvecy = matmul( M , pvecy )            #   
+        ##                                                       #
+        ## los terminos dtdx,dtdy,drdx,drdy se determinar indi-  #
+        ## rectamente calculada la matrix inversa:               #       
+        ##                                                       #
+        ##  | t,x  t,y | = | x,t   y,t |   donde                 # 
+        ##  | r,x  r,y |   | x,r   y,r |   x,t = -r sin(theta)   # 
+        ##                                 y,t =  r cos(theta)   # 
+        ##   x = r cos(theta)              x,r = cos(theta)      #
+        ##   y = r sin(theta)              y,r = sin(theta)      #
+        ##                                                       #
+        ##                                                       #
+        ##-------------------------------------------------------#
+        #f1 = (10.*a)/(8.*G)
+        #f2 = (r/a)*(k+1.)
+        #f3 = 2.*a/r
+        #f4 = (1.+k)
+        #f5 = 2.*power(a,3)/power(r,3)
+
+        #u = f1*( f2*cos(theta) + f3*(f4*cos(theta)+cos(3.*theta)) - f5*cos(3.*theta) ) 
+        #v = f1*( f2*sin(theta) + f3*(f4*sin(theta)+sin(3.*theta)) - f5*sin(3.*theta) ) 
+
+        #dudt = f1*( -f2*sin(theta) - f3*(f4*sin(theta)+3.*sin(3.*theta)) + 3.*f5*sin(3.*theta) ) 
+        #dvdt = f1*( f2*cos(theta) + f3*(f4*cos(theta)+3.*cos(3.*theta)) - 3.*f5*cos(3.*theta) ) 
+
+        #f2 = (1/a)*(k+1.)
+        #f3 = -2.*a/power(r,2)
+        #f5 = 6.*power(a,3)/power(r,4)
+
+        #dudr = f1*( f2*cos(theta) + f3*(f4*cos(theta)+cos(3.*theta)) - f5*cos(3.*theta) ) 
+        #dvdr = f1*( f2*sin(theta) + f3*(f4*sin(theta)+sin(3.*theta)) - f5*sin(3.*theta) ) 
+
+        #M = array( [[dudt,dudr],[dvdt,dvdr]] )
+
+        #dxdt = -r*cos(theta) ; dxdr = cos(theta)
+        #dydt =  r*sin(theta) ; dydr = sin(theta)
+
+        #tsr = array( [[dxdt,dydt],[dxdr,dydr]] )
+        #tsr = inv(tsr)
+
+        
+        # -------------- coordenadas polares --------
+        r = sqrt( power(x,2) + power(y,2) )
+        if ( x <= 0.0 ):
+            theta = 0.5*pi
+        elif ( y <= 0.0 ):
+            theta = 0.0
+        else:
+            theta = arccos(x/r) # = arcsin(y,r)
+
+        Tx = 1.0
+        a  = 1.0
+
+        f1 = a/power(r,2)
+        f2 = 1.5*a/r
+        f3 = a/r
+
+        sigmax =  Tx*(1.-f1*(1.5*cos(2.*theta)+cos(4.*theta))+f2*cos(4.*theta))
+        sigmay = -Tx*(f3*(0.5*cos(2.*theta)-cos(4.*theta))+f2*cos(4.*theta))
+        tauxy  = -Tx*(f3*(0.5*sin(2.*theta)+sin(4.*theta))+f2*sin(4.*theta))
+
+        #   PENDIENTES!! 
+        u = 0. ; v = 0. ; epsxx = 0. ; epsyy = 0. ; epsxy = 0.
+
+        return u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
 
     else:
         print('Error: test no implementado')

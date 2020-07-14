@@ -2,18 +2,20 @@
 
 # parametros generales
 
-all_test='patchtest-0 patchtest-1 patchtest-2'
+all_test='patchtest-0 patchtest-1 patchtest-2 infinite-plate'
+all_test='infinite-plate'
 all_npts='3-3 5-5 11-11 21-21 31-31 41-41 51-51'
-#
+
 #all_test='cantilever'
 #all_npts='17-3 25-4 33-5 41-6 49-7 57-8 65-9 72-10 81-11'
-###all_test='cantilever'
-##all_npts='17-3'
+
 
 E='1000.0'
 v='0.3'
+#plot='True'
 plot='False'
-show='True'
+#show='True'
+show='False'
 npmin='9'
 npmax='12'
 

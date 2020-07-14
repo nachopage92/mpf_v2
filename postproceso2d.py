@@ -25,6 +25,7 @@ class Meshfree2d_Postproceso_Data():
         self.sol_aprox_figure_folder = './GRAFICOS/SOL_APROX/'
         self.sol_exact_figure_folder = './GRAFICOS/SOL_EXACT/'
         self.nubes_figure_folder     = './GRAFICOS/CLD/'
+        self.shape_figure_folder     = './GRAFICOS/SHP/'
 
         from os import path,makedirs
         if not path.exists('./GRAFICOS/'):
@@ -39,6 +40,7 @@ class Meshfree2d_Postproceso_Data():
         self.geometry_filename  = preproceso_folder+filename+'.dat'
         self.elementos_filename = preproceso_folder+filename+'.elem'
         self.cloud_filename     = nubes_folder+filename+'.CLD'
+        self.shpfcn_filename    = nubes_folder+filename+'.SF'
         self.solution_filename  = sol_aprox_data_folder+filename+'2d.res'
 
         # formato de figura exportado
@@ -61,6 +63,9 @@ class Meshfree2d_Postproceso_Data():
 
         # cloud figure name
         self.cloud_figure = self.nubes_figure_folder+filename+fmt
+
+        # shape function figure name
+        self.shpfcn_figure = self.shape_figure_folder+filename+fmt
 
         # numero de puntos por lado
         self.npts = npts
@@ -101,7 +106,6 @@ class Meshfree2d_Postproceso_Data():
                    'ERROR_GLOBAL':self.ERROR_GLOBAL,\
                    'PLOT_CLOUD':self.GRAFICAR_NUBES}
                    #'ERROR_LOCAL':self.ERROR_LOCAL} # pendiente
-                   #'GRAFICAR_DEFORMACION':self.GRAFICAR_DEFORMACION} # pendiente 
                     
         return mapping
 
@@ -136,6 +140,21 @@ class Meshfree2d_Postproceso_Data():
             self.pts_dist = pts_dist
             return
 
+    """
+        sol_type : formato en que se almacena la solucion
+                    displ_i = (u,v)_i
+                    tracc_i = (sx,sy,tau)_i            
+    """
+    class sol_type:
+        def __init__(self,displ_sol,tracc_sol):
+            displ = []
+            for u,v in displ_sol:
+                displ.append((u,v))
+            tracc = []
+            for sx,sy,tau in tracc_sol:
+                tracc.append((sx,sy,tau))
+            self.displ = displ
+            self.tracc = tracc
 
     # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -244,9 +263,9 @@ class Meshfree2d_Postproceso_Data():
     """
         IMPORTAR_NUBES
     """
-    def IMPORTAR_NUBES(self,filename):
+    def IMPORTAR_NUBES(self):
     
-        f = open(filename,'r')
+        f = open(self.cloud_filename,'r')
         contents = f.read()
         f.close()
         file_as_list = contents.splitlines()
@@ -260,7 +279,35 @@ class Meshfree2d_Postproceso_Data():
                 aux2.append(int(aux1[i+1]))
             nube.append(aux2)
 
-        return nube
+        self.nubes = nube
+        return 
+
+    """
+        IMPORTAR_FUNCION_DE_FORMA()
+        lectura de la funcion de forma (archivo con extension '.SF')
+    """
+    def IMPORTAR_FUNCION_DE_FORMA(self):
+    
+        f = open(self.shpfcn_filename,'r')
+        contents = f.read()
+        f.close()
+        file_as_list = contents.splitlines()
+
+        npoin = len(self.nubes)
+
+        shpfcn = [] ; icont = 0
+        for i in range(npoin):
+            phi = [[] for i in range(6)]
+            for j in range(6):
+                splitline = file_as_list[icont].split()
+                icont +=1
+                for line in splitline:
+                    phi[j].append(float(line))
+            icont +=1 
+            shpfcn.append(phi)
+
+        self.shpfcn = shpfcn
+        return 
 
 
     """
@@ -300,27 +347,33 @@ class Meshfree2d_Postproceso_Data():
     def GRAFICAR_NUBES(self):
         
         # importar datos de la nube de puntos
-        self.nubes = self.IMPORTAR_NUBES(self.cloud_filename)
-        self.coord = self.LECTURA_GEOMETRIA(self.geometry_filename)
-        
+        self.IMPORTAR_NUBES()
+        self.IMPORTAR_FUNCION_DE_FORMA()
+        self.LECTURA_DATA()
+        self.LECTURA_ELEMENTOS()
+
         # mostrar 'n_of_figures' funciones de forma 
         # (son muchos datos para graficar!)
         n_of_figures = 10
-        npoin=len(self.coord)
+        npoin=len(self.geometry.coord)
 
         #steps=int(npoin/n_of_figures)#        <---------------------
         steps = 1 # grafica todas las func. de forma
 
         from os import path,makedirs
-        if not path.exists(self.nubes_figure_folder):
-            makedirs(self.nubes_figure_folder)
+        folders = [self.nubes_figure_folder,self.shape_figure_folder]
+        for folder in folders:
+            if not path.exists(folder):
+                makedirs(folder)
 
         for j in range(0,npoin,steps):
             cld = self.nubes[j]
+            phi = self.shpfcn[j]
             for i in range(len(cld)): # enumeracion de python
                 cld[i] = cld[i] - 1   # parte de cero
             title = r'Nube de proximidad, nodo estrella '+str(j+1)+', test '+self.test
-            PLOT_CLOUDS(title,j,self.coord,cld,self.cloud_figure,self.show)
+            PLOT_CLOUDS(title,j,self.geometry.coord,cld,self.cloud_figure,self.show)
+            PLOT_SHAPES(title,j,self.geometry.coord,cld,phi,self.shpfcn_figure,self.show)
         
         return
     
@@ -463,19 +516,9 @@ class Meshfree2d_Postproceso_Data():
             tracc_sol.append( (sx,sy,tau) )
             sol_list2.append( idpt )
 
-        class sol_type:
-            def __init__(self,displ_sol,tracc_sol):
-                displ = []
-                for u,v in displ_sol:
-                    displ.append((u,v))
-                tracc = []
-                for sx,sy,tau in tracc_sol:
-                    tracc.append((sx,sy,tau))
-                self.displ = displ
-                self.tracc = tracc
         
         if (sol_list1==sol_list2):
-            self.solution = sol_type(displ_sol,tracc_sol)
+            self.solution = self.sol_type(displ_sol,tracc_sol)
         else:
             print('LECTURA_SOLUCION: Error')
             print(' sol_list1 =! sol_list2 ')
@@ -490,27 +533,22 @@ class Meshfree2d_Postproceso_Data():
     def ERROR_GLOBAL(self):
      
         def calculo_solucion_exacta():
-            # ¿es mejor calcularlo o importarlo?
-            geo = self.LECTURA_GEOMETRIA(self.colloc_geometry_filename)
-            x,y = zip(*geo)
-            aux = [] ; sol = {}
-            from Meshfree2d_Preproceso import SOLUCION_EXACTA
-            for x,y in geo:
-                aux.append(SOLUCION_EXACTA(self.test,x,y))
-            if (self.soltype=='linear-elastic'):
-                sol['u'],sol['v'],sol['epsxx'],sol['epsyy'],sol['epsxy'],\
-                sol['sigmax'],sol['sigmay'],sol['tauxy'] = zip(*aux)
-            elif (self.soltype=='poisson'):
-                sol['u'],sol['dudx'],sol['dudy'] = zip(*aux)
-            return sol
+            displ = [] ; tracc = []
+            from exactsol import SOLUCION_EXACTA
+            for x,y in zip(*self.geometry.coord):
+                for u,v,ex,ey,exy,sx,sy,tau in SOLUCION_EXACTA(self.test,x,y,E=E,v=v):
+                    displ.append((u,v))
+                    tracc.append((sx,sy,tau))
+
+            self.solexact = sol_type(displ,tracc)
+            return
 
         def distancia_internodal():
             # la distancia internodal esta dada por la ecuacion:
             #    h_car = sqrt( Area ) / ( sqrt(npoints) - 1 )
             # (An Introduction to Meshfree Methods and Their Programming, por Liu)
-            geo = self.LECTURA_GEOMETRIA(self.colloc_geometry_filename)
-            x,y = zip(*geo)
-            Lx = max(x)-min(x) ; Ly = max(y)-min(y) ; npoin = len(geo)
+            x,y = zip(*self.geometry.coord)
+            Lx = max(x)-min(x) ; Ly = max(y)-min(y)
             # OBS: supone area rectangular: A = Lx * Ly
             dc = pow(Lx*Ly,0.5)/(pow(npoin,0.5)-1)
             return dc
@@ -520,13 +558,19 @@ class Meshfree2d_Postproceso_Data():
         # sean coherentes, verificar que se cumpla: 
         # len(sol_exact) = len(sol_aprox)
 
+        # ¿es mejor calcularlo o importarlo?
+        self.LECTURA_DATA()
+        E = self.young_modulus
+        v = self.poisson_coeff
+        npoin = len(self.geometry.coord)
+
         # soluciones a comparar
-        sol_exact = calculo_solucion_exacta()
-        sol_app   = self.LECTURA_SOLUCION(self.sol_aprox_filename)
+        calculo_solucion_exacta()    # almacenado en self.solexact
+        self.LECTURA_SOLUCION()      # almacenado en self.solucion
         
         # calculo del error
         error = {}
-        size = len(sol_exact['u'])
+        size = len(self.solexact.displ) # o len(self.solexact.tracc), da igual
 
         if (self.measure_type=='promedio'):
             for key in sol_exact.keys():
@@ -554,33 +598,82 @@ class Meshfree2d_Postproceso_Data():
         self.error = error
         return
 
+
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+def PLOT_SHAPES(title,idpt,coords,connect,phi,filename,show):
+
+    import matplotlib.pyplot as plt
+    import mpl_toolkits.mplot3d.axes3d as p3
+
+    # coordenadas pts nubes
+    cld_coords = []
+    for pt in connect:
+        cld_coords.append(coords[pt])
+        
+    # extrae data en vectores
+    x,y = zip(*coords)
+    xcld,ycld=zip(*cld_coords)
+    p,dpx,dpy,ddpxx,ddpxy,ddpyy = phi
+
+    # permite utilizar latex
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+
+    # crear figura NUBE
+    fig=plt.figure(num=None,figsize=(8,6),dpi=80,facecolor='w',edgecolor='k')
+    title += r", idpt="+str(idpt+1)
+    fig.suptitle(title, fontsize=12)
+
+    #crear subfigura NUBE
+    ax1 = fig.add_subplot(231,projection='3d')
+    ax2 = fig.add_subplot(232,projection='3d')
+    ax3 = fig.add_subplot(233,projection='3d')
+    ax4 = fig.add_subplot(234,projection='3d')
+    ax5 = fig.add_subplot(235,projection='3d')
+    ax6 = fig.add_subplot(236,projection='3d')
+
+    # asignar ejes
+    ax1.set_xlabel(r'$x$');ax1.set_ylabel(r'$y$');ax1.set_zlabel(r'$\phi$')
+    ax2.set_xlabel(r'$x$');ax2.set_ylabel(r'$y$');ax2.set_zlabel(r'$\frac{\partial \phi}{\partial x}$')
+    ax3.set_xlabel(r'$x$');ax3.set_ylabel(r'$y$');ax3.set_zlabel(r'$\frac{\partial \phi}{\partial y}$')
+    ax4.set_xlabel(r'$x$');ax4.set_ylabel(r'$y$');ax4.set_zlabel(r'$\frac{\partial^2 \phi}{\partial x^2}$')
+    ax5.set_xlabel(r'$x$');ax5.set_ylabel(r'$y$');ax5.set_zlabel(r'$\frac{\partial^2 \phi}{\partial x \partial y}$')
+    ax6.set_xlabel(r'$x$');ax6.set_ylabel(r'$y$');ax6.set_zlabel(r'$\frac{\partial^2 \phi}{\partial y^2}$')
+
+    # plot
+    ax1.plot_trisurf(xcld,ycld,p)
+    ax2.plot_trisurf(xcld,ycld,dpx)
+    ax3.plot_trisurf(xcld,ycld,dpy)
+    ax4.plot_trisurf(xcld,ycld,ddpxx)
+    ax5.plot_trisurf(xcld,ycld,ddpxy)
+    ax6.plot_trisurf(xcld,ycld,ddpyy)
     
+    # distancia entre graficos
+    fig.tight_layout()
+    
+    # archivo a exportar
+    fmt = filename.split('.')[-1] 
+    filename=filename.replace('.'+fmt,'_'+str(idpt+1)+'.'+fmt)
 
+    fig.savefig(filename)
+    
+    if (show):
+        plt.show()
+    
+    # limpiar variables matplotlib
+    plt.cla()    # clear axis
+    plt.clf()    # clear figure
+    plt.close()  # close a figure windows
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return
 
 
 
 def PLOT_CLOUDS(title,idpt,coords,connect,filename,show):
         
     import matplotlib.pyplot as plt
-    import mpl_toolkits.mplot3d.axes3d as p3
-    import matplotlib.gridspec as gridspec
 
     # coordenadas pts nubes
     cld_coords = []
@@ -597,13 +690,11 @@ def PLOT_CLOUDS(title,idpt,coords,connect,filename,show):
 
     # crear figura NUBE
     fig=plt.figure(num=None,figsize=(8,6),dpi=80,facecolor='w',edgecolor='k')
+    title += r", idpt="+str(idpt+1)
     fig.suptitle(title, fontsize=12)
 
     #crear subfigura NUBE
     ax = fig.add_subplot(111)
-
-    # subtitulo
-    ax.set_title(r"idpt="+str(idpt+1),fontsize=10)
 
     # asignar ejes
     ax.set_xlabel( r'$x$' ) ; ax.set_ylabel( r'$y$' ) 

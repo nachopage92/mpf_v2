@@ -44,7 +44,19 @@ def boundary_condition_assignment(test,lado,pt):
             cond = 4       #   -> tau_traction (zero)
         elif ( lado == 3 ): # borde izquierdo
             cond = 3       #   -> uv_displacement
+    elif ( test=='infinite-plate' ):
+        if ( lado == 0):
+            cond = 2
+        if ( lado == 1 ):
+            cond = 4
+        if ( lado == 2 ):
+            cond = 4
+        if ( lado == 3 ):
+            cond = 1
+        if ( lado == 4 ):
+            cond = 4
     else:
+        print('boundary_condition_assignment():')
         print('ERROR: Test no registrado')
         from sys import exit; exit('Program stopped')
 
@@ -68,29 +80,50 @@ def order_boundary_list(test):
         #       I
         priority_order_list = [ 0 , 1 , 2 , 3 ]  # orden irrelevante
     elif ( test == 'patchtest-1' ):
-        #     _III_       en I   : preescribe v=0 y dot(sigma,n)_x = 0
-        #    |     |      en II  : preescribe dot(sigma,n) = traction
-        # IV |     | II   en III : preescribe dot(sigma,n) = traction = 0
-        #    |_____|      en IV  : preescribe u=0 y dot(sigma,n)_y = 0
+        #     _III_       en I   : preesc. v=0 y dot(sigma,n)_x = tx
+        #    |     |      en II  : preesc. dot(sigma,n) = traction
+        # IV |     | II   en III : preesc. dot(sigma,n) = traction
+        #    |_____|      en IV  : preesc. u=0 y dot(sigma,n)_y = ty
         #       I
         priority_order_list = [ 1 , 2 , 0 , 3 ]
     elif ( test == 'patchtest-2' ):
-        #     _III_       en I   : preescribe v=0 y dot(sigma,n)_x = 0
-        #    |     |      en II  : preescribe dot(sigma,n) = traction
-        # IV |     | II   en III : preescribe dot(sigma,n) = traction = 0
-        #    |_____|      en IV  : preescribe u=0 y dot(sigma,n)_y = 0
+        #     _III_       en I   : preesc. v=0 y dot(sigma,n)_x = tx
+        #    |     |      en II  : preesc. dot(sigma,n) = traction
+        # IV |     | II   en III : preesc. dot(sigma,n) = traction
+        #    |_____|      en IV  : preesc. u=0 y dot(sigma,n)_y = ty
         #       I
         priority_order_list = [ 1 , 2 , 0 , 3 ]
     elif ( test=='cantilever'):
-        #    _______III______       en I   : preescribe dot(sigma,n) = traction = 0
-        #    |               |      en II  : preescribe dot(sigma,n) = traction
-        # IV |               | II   en III : preescribe dot(sigma,n) = traction = 0
-        #    1_______________|      en IV  : preescribe u=0 y v=0
+        #    _______III______       en I   : preesc. dot(sigma,n) = traction
+        #    |               |      en II  : preesc. dot(sigma,n) = traction
+        # IV |               | II   en III : preesc. dot(sigma,n) = traction
+        #    1_______________|      en IV  : preesc. u=0 y v=0
         #            I
         priority_order_list = [ 0 , 1 , 2 , 3 ]
+    elif ( test=='infinite-plate'):
+        #    _______III______       en I   : preesc. v=0 y dot(sigma,n)_x = tx
+        # IV |               |      en II  : preesc. dot(sigma,n) = traction
+        #    --\             |II    en III : preesc. dot(sigma,n) = traction
+        #     V |____________|      en IV  : preesc. u=0 y dot(sigma,n)_y = ty
+        #                           en V   : preesc. dot(sigma,n) = traction 
+        #            I
+        priority_order_list = [ 4 , 2 , 1 , 0 , 3 ]
     else:
+        print(' order_boundary_list(): ')
         print('ERROR, test no ingresado')
         from sys import exit ; exit('Program stopped')
 
     return priority_order_list
 
+
+def sub_boundary_side( test ):
+    # ingresa subcontornos en caso de haberlos
+    edge_tol = 1e-12
+    refinement = [0,0]
+    subs = [[],[],[],[]]
+    if ( test == 'infinite-plate' ):
+        subs = [[],[0.5],[],[]]
+        refinement = [0,0]
+    return subs, edge_tol, refinement
+    
+    

@@ -651,7 +651,9 @@ program Finite_Point_Method_Solver
 !----------------------------------------------------------!
 
     subroutine N_DN_D2N
-        integer i
+        integer i,j
+        character(len=15) :: formato
+        character(len=100) :: cldfile
         CALL N_DN_D2N_FWLS
         CALL N_DN_D2N_MaxEnt
         allocate( RM(NCONS,MAXCLD,NNOD) ) ; RM=0.d0
@@ -659,8 +661,8 @@ program Finite_Point_Method_Solver
             if ( any( i .eq. inorm_node) ) then ! pertenece al contorno : fwls
                RM(1:NCONS,1:MAXCLD,i) = RM_FWLS(1:NCONS,1:MAXCLD,i) 
             else ! pertenece al interior
-               RM(1:NCONS,1:MAXCLD,i) = RM_MaxEnt(1:NCONS,1:MAXCLD,i) 
-               !RM(1:NCONS,1:MAXCLD,i) = RM_FWLS(1:NCONS,1:MAXCLD,i) 
+               !RM(1:NCONS,1:MAXCLD,i) = RM_MaxEnt(1:NCONS,1:MAXCLD,i) 
+               RM(1:NCONS,1:MAXCLD,i) = RM_FWLS(1:NCONS,1:MAXCLD,i) 
             end if
             !print*, 'inod (nodo estrella) = ',i  ;   print*,'phi:'
             !print*, RM(1,:,i)                    ;   print*, ''
@@ -668,6 +670,18 @@ program Finite_Point_Method_Solver
 
         ! despejar espacio
         deallocate(RM_FWLS,RM_MaxEnt)
+
+        ! exportar datos de la funcion de forma
+        cldfile = trim(filename)//'.SF'
+        open(unit=10,file=cldfile)
+        do i = 1,nnod
+            write(formato,'(I5)') NPUNTOS(i) ; formato = adjustl(formato)
+            do j = 1 , NCONS
+                write(10,'('//trim(formato)//'E25.13)') RM(j,1:NPUNTOS(i),i)
+            end do
+            write(10,*)
+        end do
+        close(unit=10)
         
         return
     end subroutine N_DN_D2N

@@ -67,9 +67,32 @@ def NURBS2D_MESHING(test,npts,**kwargs):
     
     # Create a BSpline surface instance
     surf = NURBS.Surface()
-    # Import smesh file (contains ctrlpts,knotvectors,degree)
-    imported = exchange.import_smesh("./ctrlpts_data/"+filename)
-    surf = imported[0]
+
+
+    ## ---------- una manera, cargar datos externamente: -----------
+    ## Import smesh file (contains ctrlpts,knotvectors,degree)
+    #imported = exchange.import_smesh("./ctrlpts_data/"+filename)
+    #surf = imported[0]
+    ## -------------------------------------------------------------
+
+    # ----------- otra manera es cargarlo directamente-------------
+    from init_data import nurbs_geom_data
+    degree,dim,knotvector,ctrlptsw = nurbs_geom_data(test)
+
+    surf.degree_u = degree[0]
+    surf.degree_v = degree[1]
+    surf.ctrlpts_size_u = dim[0]
+    surf.ctrlpts_size_v = dim[1]
+    surf.ctrlptsw = ctrlptsw
+    surf.knotvector_u = knotvector[0]
+    surf.knotvector_v = knotvector[1]
+    #xctrl,yctrl,zctrl,wctrl = zip(*ctrlptsw)
+    ## -------------------------------------------------------------
+
+    w         = surf.weights            # weight
+    ctrlpts   = surf.ctrlpts      # unweighted ctrlpts
+    ctrlpts2d = surf.ctrlpts2d  # weighted ctrlpts array
+    ctrlptsw  = surf.ctrlptsw    # weighted ctrls
 
     # ------------------------------------------------------------
 
@@ -77,11 +100,10 @@ def NURBS2D_MESHING(test,npts,**kwargs):
     #delta = kwargs.get('delta',[0.05,0.05])
     #delta_u,delta_v = delta
 
-    #density_refinement = kwargs.get('density_refinement',[0,0])
-    #density_u,density_v = density_refinement
-
-    ## Refines the knot vector on the v-direction of a surface
-    #operations.refine_knotvector(surf,[density_u,density_v])
+    # Refines the knot vector on the v-direction of a surface
+    density_refinement = kwargs.get('refinement',[0,0])
+    density_u,density_v = density_refinement
+    operations.refine_knotvector(surf,[density_u,density_v])
 
     ## Set evaluation delta
     #surf.delta_u = delta_u
@@ -120,6 +142,9 @@ def NURBS2D_MESHING(test,npts,**kwargs):
         physical_pts.append(\
         mapping_from_parametrical_to_physical_coordinates_2d(uv_knots,surf))
         c += 1
+
+    nnod  = c-1 # numero de nodos totales
+    nnorm = 2*(cnptx-1) + 2*(cnpty-1)
     
     #   MALLADOR en espacio parametrico mediante triangulacion Delaunay
 
@@ -141,178 +166,76 @@ def NURBS2D_MESHING(test,npts,**kwargs):
 
     #   CREAR CONTORNOS (Geometry)
 
-    #       a) PUNTOS DE COLOCACION (NODOS) EN EL CONTORNO
-
+    # puntos del contorno
     colloc_l1,colloc_l2 = \
     create_matrix_outline(cnptx,cnpty)
 
-    #       b)  CALCULAR VECTOR NORMAL ASOCIADO A CADA PUNTO,
-    #               En los contornos del dominio bidimensional
-    #               se 'contrae' una dimension,  resultando en
-    #               una curva (tambien bidimensional)
-
-    #               b.1) se determinan los puntos de control del contorno
-    ctrlpts_l1,ctrlpts_l2 = \
-    create_matrix_outline(surf.ctrlpts_size_u,surf.ctrlpts_size_v)
-
-    types=[] ; newsubs=[]
+    # verifica si existen subcontornos
+    types=[] ; newsubs=[] ; cstop=[] ; cl1=[] ; cl2=[-1] ; cont=-1 
     for pos in range(4):
         # se extrae puntos de la lista encadenada
         ptslist = colloc_l1[colloc_l2[pos]+1:colloc_l2[pos+1]+1]
 
         if ( pos == 0 ) : # lado inferior
-            colloc_knots = collocation_uknots
+            colloc_knots = list(collocation_uknots)
         elif ( pos == 1 ):   # lado derecho
             colloc_knots = collocation_vknots
         elif ( pos == 2 ) : # lado superior
             colloc_knots = list(collocation_uknots)
             colloc_knots.reverse()
-            colloc_knots = np.array(colloc_knots)
         elif ( pos == 3 ):   # lado izquierdo
             colloc_knots = list(collocation_vknots)
             colloc_knots.reverse()
-            colloc_knots = np.array(colloc_knots)
 
-        bdrynum = len(subs[pos])+1 # +1 por cada nuevo punto xi
-        newbdry1=[] ; newbdry2=[] ; aux=[]
-        cbdry = 0   ; new_elem=0
+        newbdry1=[] ; newbdry2=[] ; aux=[] ; stops=[]
+        stop = -1 ; cbdry = -1 ; new_elem = 0
         types.append(pos) ; newsubs.append(subs[pos])
-
-        # se verifica si existen subcontornos
         for idpt,xipt in zip(ptslist,colloc_knots):
-            aux.append(idpt) ; cbdry+=1 
+            aux.append(idpt) ; cbdry+=1 ; stop+=1
             for jpt in subs[pos]:
                 if ( jpt == xipt ) :
                     new_elem +=1
-                    newbdry1.append(aux)
-                    newbdry2.append(cbdry)
-                    aux = [idpt] ; cbdry+=1
-                    types.append(pos) ; newsubs.append(subs[pos])
+                    newbdry1.append(aux) ; aux= [idpt]
+                    newbdry2.append(cont+1) ; cont+=1
+                    types.append(pos)
+                    newsubs.append(subs[pos])
+                    stops.append(stop)
+            cont+=1
+
+        cstop.append(stops)
+
         newbdry1.append(aux)
-        newbdry2.append(cbdry)
-        new_colloc_l2 = [ colloc_l2[pos] ]
+        newbdry2.append(cont)
 
-        for i in newbdry2:
-            new_colloc_l2.append( colloc_l2[pos]+i )
+        #new_colloc_l2 = [ colloc_l2[pos] ]
+        new_colloc_l2 = [ ]
+        for xpos in newbdry2:
+            new_colloc_l2.append( xpos )
         new_colloc_l1 = [ ]
-        for xp in newbdry1:
-            new_colloc_l1.extend( xp )
+        for xpts in newbdry1:
+            new_colloc_l1.extend( xpts )
 
-        # actualizacion de las listas encadenadas
-        part1 = colloc_l1[:colloc_l2[pos]+1]
-        part1.extend(new_colloc_l1)
-        part1.extend(colloc_l1[colloc_l2[pos+1]+1:])
-        colloc_l1 = part1
+        cl1.extend(new_colloc_l1)
+        cl2.extend(new_colloc_l2)
 
-        part2 = colloc_l2[:pos]
-        part2.extend(new_colloc_l2)
-        aux = []
-        for i in colloc_l2[pos+2:]:
-            aux.append(i+new_elem*2)
-        part2.extend(aux)
-        colloc_l2 = part2
+    # new linked list
+    colloc_l1 = cl1
+    colloc_l2 = cl2
 
-
-    # --------- end for ---------------
-
-    #               b.2) loop sobre cada punto del contorno en sentido antihorario
-    contador = -1 ; nsides = len(colloc_l2) ; subs = newsubs ; ind = 1
-    normal_list1 = [] ; normal_list2 = [ contador ] 
-    for pos in range(nsides-1): # recorre cada lado
-
-        ctrlpts_list = ctrlpts_l1[ctrlpts_l2[types[pos]]+1:ctrlpts_l2[types[pos]+1]+1]
-        #       TENER EN CONSIDERACION: LOS VERTICES SE REPITEN! 
-        #       lado-1 : v1._____.v2 (v1 contabilizado dos veces)  
-        #       lado-2 : v2._____.v3 (v2 contabilizado dos veces)  
-        #       lado-3 : v3._____.v4 (v3 contabilizado dos veces)  
-        #       lado-4 : v4._____.v1 (v4 contabilizado dos veces)  
-        
-        # transponer surf.ctrlpts2d
-        ctrlpts2d = tranpose_array2d(surf.ctrlpts2d)
-        # se obtienen los puntos de control asociados a cada
-        # curva del contorno
-        ctrlptsw=[]
-        for ids in ctrlpts_list:
-            ctrlptsw.append(ctrlpts2d[ids])
-        # _____________________________________________
-        # |          -- FIGURA 1 --                    |
-        # | Ejemplo:  'contorno inferior'              |
-        # |  __________                                | 
-        # | |          |       \   xi=0.0       xi=1.0 | 
-        # | | eta      |  ======\  ___________________ |
-        # | | |__ xi   |  ======/  xi=variable ; eta=0 | 
-        # | |__________|       /                       |        
-        # |                                            | 
-        # |  Espacio 2D   -- contrae-->   Espacio 1D   |
-        # |                                            |   
-        # | S(xi=0,eta) = C(eta) : contorno izquierdo  |  
-        # | S(xi=1,eta) = C(eta) : contorno derecho    |    
-        # | S(xi,eta=0) = C(xi)  : contorno inferior   |     
-        # | S(xi,eta=1) = C(xi)  : contorno superior   |      
-        # |____________________________________________|
-
-        #  --- algunas modificaciones segun  ---
-        if ( types[pos] == 0 ) : # lado inferior
-            degree = surf.degree_u
-            knots = surf.knotvector_u
-            colloc_knots = collocation_uknots
-        elif ( types[pos] == 1 ):   # lado derecho
-            degree = surf.degree_v
-            knots = surf.knotvector_v
-            colloc_knots = collocation_vknots
-        elif ( types[pos] == 2 ) : # lado superior
-            degree = surf.degree_u
-            knots = surf.knotvector_u
-            colloc_knots = list(collocation_uknots)
-            colloc_knots.reverse()
-            colloc_knots = np.array(colloc_knots)
-        elif ( types[pos] == 3 ):   # lado izquierdo
-            degree = surf.degree_v
-            knots = surf.knotvector_v
-            colloc_knots = list(collocation_vknots)
-            colloc_knots.reverse()
-            colloc_knots = np.array(colloc_knots)
-        else:
-            from sys import exit
-            exit('ERROR: contorno no identificado')
-
-        # crea elemento GEOMDL
-        curve = NURBS.Curve()
-        curve.degree = degree
-        curve.ctrlptsw = ctrlptsw
-        curve.knotvector = knots 
-        ptslist = colloc_l1[colloc_l2[pos]+1:colloc_l2[pos+1]+1]
-
-        # se recorre cada punto de colocacion del contorno
-        for idpt,xipt in zip(ptslist,colloc_knots):
-            xipt_ = xipt
-            for jpt in subs[pos]:
-                if ( jpt == xipt ) :
-                    if ( jpt == 0.0 ) : 
-                        xipt_ = xipt + tol 
-                    elif ( jpt == 1.0 ) : 
-                        xipt_ = xipt - tol
-                    else :
-                        ind += 1
-                        xipt_ = xipt - tol*pow(-1.0,ind)
-            normal_list1.append( curve.normal(xipt_,normalize=True) )
-            # OBS: normal_list2 = colloc_l2
-            contador += 1
-            # x =  mapping_from_parametrical_to_physical_coordinates_1d(xipt,curve)
-        normal_list2.append( contador )
-
-    # D) Creacion de elementos lineas pertenecientes al contorno
+    #  crear elementos lineas
     line_elements = []
-    for pos in range(4): # recorre cada lado
+    for pos in range( len(colloc_l2)-1 ): # recorre cada lado
         pts_list = colloc_l1[colloc_l2[pos]+1:colloc_l2[pos+1]+1]
         for i in range(len(pts_list)-1):
             elem1 = pts_list[i]
             elem2 = pts_list[i+1]
             line_elements.append( [elem1,elem2] )
 
+    normal,inormal = normales(physical_pts,line_elements,nnorm,nnod)
+
     # output variable, contiene las listas enlazadas y las coordenadas
     # y normales asociadas a cada punto
-    boundary = [normal_list1,colloc_l1,colloc_l2,line_elements]
+    boundary = [colloc_l1,colloc_l2,normal,inormal,line_elements]
 
     #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::.
     
@@ -351,21 +274,6 @@ def mapping_from_parametrical_to_physical_coordinates_2d(uv_knots,surf):
     physical_pts = suma
     return physical_pts
 
-def mapping_from_parametrical_to_physical_coordinates_1d(uknot,curve):
-    from geomdl import helpers
-    from numpy import array,multiply
-    # span
-    span_u = helpers.find_span_linear(curve.degree,curve.knotvector,curve.ctrlpts_size,uknot) #tambien se puede utilizar find_span_binsearch()
-    # basis function
-    N = helpers.basis_function(curve.degree,curve.knotvector,span_u,uknot)
-    # mapping to phyisical space
-    suma = array([0.0,0.0])
-    for ni in range(curve.degree+1):
-        suma += multiply(curve.ctrlpts[span_u-curve.degree+ni][0:2],N[ni])
-        suma = list(suma)
-    # S(xi) = sum_{i} [ CtrlPts_{i} * R_{i} ] unidimensional
-    physical_pts = suma
-    return physical_pts
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::.
 
@@ -441,32 +349,49 @@ def tranpose_array2d(input_list):
             ctrlpts2d_flatten.append(list(elem))
     return ctrlpts2d_flatten
 
-    
-#   EXPORTAR DATOS
-    
-#export = kwargs.get('export',False)
-#
-##   EXPORTAR MALLA: modificar a gusto
-#if ( export ) : 
-#    
-#    # si no existe la carpeta la crea
-#    dir_ = '../DATOS/test2d/mesh/'
-#    if ( not os.path.isdir(dir_) ):
-#        os.mkdir(dir_)
-#    
-#    from numpy import prod
-#    filename = '../DATOS/test2d/mesh/'+test+'_'+str(prod(npts))+'.dat'
-#    f = open(filename,'w')
-#    f.write('Coordinates\n')
-#    for pts in physical_source_pts:
-#      f.write('{0:20.12e} {1:20.12e}\n'.format(pts[0],pts[1]))
-#    f.write('End Coordinates\n')
-#    f.write('Elements\n')
-#    for elems in triangulation.simplices.copy():
-#      f.write('{0:5d} {1:5d} {2:5d}\n'.format(elems[0],elems[1],elems[2]))
-#    f.write('End Elements\n')
-#    f.close()
-#
+"""
+    normales
+    calcula el vector normal de los bordes. se calcula 
+    utilizando los elementos linea del contorno
+"""
+def normales(xcoord,linelem,nnorm,nnod):
+
+    B = [ 0.0 for i in range(nnod*2) ]
+    x,y = zip(*xcoord)
+
+    for i in range(nnorm): 
+
+        n1,n2 = linelem[i]
+
+        xn = y[n1]-y[n2]
+        yn = x[n2]-x[n1]
+        mod = pow(pow(xn,2)+pow(yn,2),0.5)
+        xn = xn/mod # coseno directo segun el eje x
+        yn = yn/mod # coseno directo segun el eje x
+
+        B[n1]=B[n1]+xn
+        B[n1+nnod]=B[n1+nnod]+yn
+        B[n2]=B[n2]+xn
+        B[n2+nnod]=B[n2+nnod]+yn
+
+    ivect = 0 ; cosdir=[]; inorm=[]
+    for i in range(nnod):
+        rnormal = pow( pow(B[i],2)+pow(B[i+nnod],2) , 0.5 )
+        if (rnormal > .5):
+            ivect=ivect+1
+            cl=B[i]/rnormal
+            cm=B[i+nnod]/rnormal
+            inorm.append(i)
+            cosdir.append([-cl,-cm]) # outward 
+            ivect+=1
+
+    if (ivect!=2*nnorm): # una verificacion
+        print('warning!');print('ivect != nnorm')
+        print('ivect',ivect);print('nnorm',nnorm)
+
+    return cosdir,inorm
+
+
 ##::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::.
 
 ## CREAR OBJETOS FIGURAS
