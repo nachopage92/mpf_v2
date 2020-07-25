@@ -372,7 +372,8 @@ program Finite_Point_Method_Solver
 
 !cccc-----> ec.contorno-h/2*(ec.dominio)=0
 
-            AF=0.0
+            !AF=0.0
+            AF=1.0
 
             S(J*2-1,INOD*2-1)=-((RM(4,J,INOD)+(DS1*RM(6,J,INOD)))*(AF*HCAR/2.D0))+ &
                & ((RM(2,J,INOD)*RNORM_VALUEX(I))+(DS1*RM(3,J,INOD)*RNORM_VALUEY(I)))

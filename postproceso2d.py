@@ -71,11 +71,10 @@ class Meshfree2d_Postproceso_Data():
         self.npts = npts
 
         # ------ transforma str en boolean
+        self.show = False
         if ( show != None ):
             if ( show.lower() == 'true' ):
                 self.show = True
-        else:
-            self.show = False
         
         # clasificacion del solver segun el test (customizable)
         if ( E != None ):
@@ -420,14 +419,14 @@ class Meshfree2d_Postproceso_Data():
         #    jumpx,jumpy = [ ceil(nxlim/restx) , ceil(nylim/resty) ]
 
         PLOT_DISPLACEMENT(titulo,self.geometry.coord,self.solution.displ,\
-            self.sol_aprox_export_filename[0],is_latex,self.show)
+            new_tria,self.sol_aprox_export_filename[0],is_latex,self.show)
 
         #PLOT_DISPLACEMENT_VECTOR(titulo,self.geometry.coord,self.solution.displ,\
         #    new_line,new_tria,self.sol_aprox_export_filename[2],is_latex,\
         #    self.show)
 
         PLOT_TRACTION(titulo,self.geometry.coord,self.solution.tracc,\
-            self.sol_aprox_export_filename[1],is_latex,self.show)
+            new_tria,self.sol_aprox_export_filename[1],is_latex,self.show)
 
         return
 
@@ -473,14 +472,14 @@ class Meshfree2d_Postproceso_Data():
 
 
         PLOT_DISPLACEMENT(titulo,physical_pts,displacement,\
-            self.sol_exact_export_filename[0],is_latex,self.show)
+            triangulation,self.sol_exact_export_filename[0],is_latex,self.show)
 
-        PLOT_DISPLACEMENT_VECTOR(titulo,physical_pts,displacement,\
-            bdry_lines,triangulation,self.sol_exact_export_filename[2],\
-                is_latex,self.show)
+        #PLOT_DISPLACEMENT_VECTOR(titulo,physical_pts,displacement,\
+        #    bdry_lines,triangulation,self.sol_exact_export_filename[2],\
+        #        is_latex,self.show)
 
         PLOT_TRACTION(titulo,physical_pts,traction,\
-            self.sol_exact_export_filename[1],is_latex,self.show)
+            triangulation,self.sol_exact_export_filename[1],is_latex,self.show)
 
         return
     
@@ -683,6 +682,8 @@ def PLOT_CLOUDS(title,idpt,coords,connect,filename,show):
     # extrae data en vectores
     x,y = zip(*coords)
     xcld,ycld=zip(*cld_coords)
+    dx = max(x)-min(x) #set aspect
+    dy = max(y)-min(y) # dy/dx
 
     # permite utilizar latex
     plt.rc('text', usetex=True)
@@ -698,10 +699,12 @@ def PLOT_CLOUDS(title,idpt,coords,connect,filename,show):
 
     # asignar ejes
     ax.set_xlabel( r'$x$' ) ; ax.set_ylabel( r'$y$' ) 
+    ax.set_aspect(dy/dx)
 
     # plot
     ax.scatter(x,y,color='black')              # puntos del dominio
-    ax.scatter(xcld,ycld,color='red',s=80)   # nube de puntos
+    ax.scatter(xcld,ycld,color='green',s=80)     # nube de puntos
+    ax.scatter(xcld[0],ycld[0],color='red',s=80)     # punto estrella
 
     # obtener anillo convexo de la nube
     from scipy.spatial import ConvexHull
@@ -735,14 +738,15 @@ def PLOT_CLOUDS(title,idpt,coords,connect,filename,show):
 
 
 
-def PLOT_DISPLACEMENT(titulo,colloc_pts,displ_sol,filename,is_latex,show):
+def PLOT_DISPLACEMENT(titulo,colloc_pts,displ_sol,triang,filename,is_latex,show):
 
     # -----------  preambulo graficos -------------
     import matplotlib.pyplot as plt # paquete MatPlotLib
+    import matplotlib.tri as mtri   # rutinas de triangulacion
     from mpl_toolkits.mplot3d import Axes3D  # ejes 3d
     from matplotlib import cm       # import color map
     from numpy import array
-    
+
     # formato fuente (permite utilizar latex, e.g. r'\omega')
     if (is_latex):
         plt.rc('text', usetex=True)
@@ -754,6 +758,9 @@ def PLOT_DISPLACEMENT(titulo,colloc_pts,displ_sol,filename,is_latex,show):
     # desempaquetar data
     x,y=list(zip(*colloc_pts)) 
     u,v = zip(*displ_sol)
+
+    # da formato a la triangulacion para ser utilizada por tricontourf
+    triangulacion =  mtri.Triangulation(x, y, triang)
 
     # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     
@@ -797,14 +804,14 @@ def PLOT_DISPLACEMENT(titulo,colloc_pts,displ_sol,filename,is_latex,show):
     ax1.set_title(r'Desplazamiento $u$')
     ax1.set_ylabel(r'$y$')
     ax1.set_xlabel(r'$x$')
-    element1 = ax1.tricontourf(x,y,u,cmap=cmap)
+    element1 = ax1.tricontourf(triangulacion, u, cmap=cmap)
     ax1.xaxis.set_major_locator(plt.MaxNLocator(3))
     fig.colorbar(element1,ax=ax1)
     # grafico 2
     ax2.set_title(r'Desplazamiento $v$')
     ax2.set_ylabel(r'$y$')
     ax2.set_xlabel(r'$x$')
-    element2 = ax2.tricontourf(x,y,v,cmap=cmap)
+    element2 = ax2.tricontourf(triangulacion, v, cmap=cmap)
     ax2.xaxis.set_major_locator(plt.MaxNLocator(3))
     fig.colorbar(element2,ax=ax2)
 
@@ -813,12 +820,12 @@ def PLOT_DISPLACEMENT(titulo,colloc_pts,displ_sol,filename,is_latex,show):
     # grafico 3
     ax3.set_ylabel(r'$y$')
     ax3.set_xlabel(r'$x$')
-    ax3.plot_trisurf(x,y,u)
+    ax3.plot_trisurf(triangulacion,u)
     ax3.xaxis.set_major_locator(plt.MaxNLocator(3))
     # grafico 4
     ax4.set_ylabel(r'$y$')
     ax4.set_xlabel(r'$x$')
-    ax4.plot_trisurf(x,y,v)
+    ax4.plot_trisurf(triangulacion,v)
     ax4.xaxis.set_major_locator(plt.MaxNLocator(3))
 
     # exportar grafico como archivo
@@ -923,9 +930,10 @@ def PLOT_DISPLACEMENT_VECTOR(titulo,colloc_pts,displ_sol,bdry_elem,tria,filename
 
 
 
-def PLOT_TRACTION(titulo,colloc_pts,tracc_sol,filename,is_latex,show):
+def PLOT_TRACTION(titulo,colloc_pts,tracc_sol,triang,filename,is_latex,show):
 
     # -----------  preambulo graficos -------------
+    import matplotlib.tri as mtri   # rutinas de triangulacion
     import matplotlib.pyplot as plt # paquete MatPlotLib
     from mpl_toolkits.mplot3d import Axes3D  # ejes 3d
     from matplotlib import cm       # import color map
@@ -942,6 +950,9 @@ def PLOT_TRACTION(titulo,colloc_pts,tracc_sol,filename,is_latex,show):
     # desempaquetar data
     x,y=list(zip(*colloc_pts)) 
     sigmax,sigmay,tauxy = zip(*tracc_sol)
+
+    # da formato a la triangulacion para ser utilizada por tricontourf
+    triangulacion =  mtri.Triangulation(x, y, triang)
 
     # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     
@@ -997,34 +1008,34 @@ def PLOT_TRACTION(titulo,colloc_pts,tracc_sol,filename,is_latex,show):
     # grafico 1
     ax1.set_title(r'Esfuerzos $\sigma_{xx}$')
     ax1.set_xlabel(r'$x$');ax1.set_ylabel(r'$y$')
-    element1 = ax1.tricontourf(x,y,sigmax,cmap=cmap)
+    element1 = ax1.tricontourf(triangulacion,sigmax,cmap=cmap)
     ax1.xaxis.set_major_locator(plt.MaxNLocator(3))
     fig.colorbar(element1,ax=ax1)
     # grafico 2
     ax2.set_title(r'Esfuerzos $\sigma_{yy}$')
     ax2.set_xlabel(r'$x$');ax2.set_ylabel(r'$y$')
-    element2 = ax2.tricontourf(x,y,sigmay,cmap=cmap)
+    element2 = ax2.tricontourf(triangulacion,sigmay,cmap=cmap)
     ax2.xaxis.set_major_locator(plt.MaxNLocator(3))
     fig.colorbar(element2,ax=ax2)
     # grafico 3
     ax3.set_title(r'Esfuerzos $\tau_{xy}$')
     ax3.set_xlabel(r'$x$');ax3.set_ylabel(r'$y$')
-    element3 = ax3.tricontourf(x,y,tauxy,cmap=cmap)
+    element3 = ax3.tricontourf(triangulacion,tauxy,cmap=cmap)
     ax3.xaxis.set_major_locator(plt.MaxNLocator(3))
     fig.colorbar(element3,ax=ax3)       
     # 3D plots
 
     # grafico 4
     ax4.set_ylabel(r'$y$')
-    ax4.plot_trisurf(x,y,sigmax)
+    ax4.plot_trisurf(triangulacion,sigmax)
     ax4.xaxis.set_major_locator(plt.MaxNLocator(3))
     # grafico 5
     ax5.set_ylabel(r'$y$')
-    ax5.plot_trisurf(x,y,sigmay)
+    ax5.plot_trisurf(triangulacion,sigmay)
     ax5.xaxis.set_major_locator(plt.MaxNLocator(3))
     # grafico 6
     ax6.set_ylabel(r'$y$')
-    ax6.plot_trisurf(x,y,tauxy)
+    ax6.plot_trisurf(triangulacion,tauxy)
     ax6.xaxis.set_major_locator(plt.MaxNLocator(3))
 
     # exportar grafico como archivo

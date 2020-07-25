@@ -67,13 +67,16 @@ class Preprocess_Data_Type():
         #       discretizacion regular utilizando algoritmo simple aplicado
         #       al dominio parametrico NURBS. 
         from nurbs_meshgen import NURBS2D_MESHING
-        from bdrycond import sub_boundary_side   
+        from bdrycond import additional_info,input_knots
 
         # check for subboundary
-        subs,edge_tol,ref = sub_boundary_side(self.test)
+        subs,edge_tol,ref = additional_info(self.test)
+
+        # knots
+        in_knots = input_knots(self.test,self.nptside)
 
         self.coord,self.tri,self.bdry = NURBS2D_MESHING(self.test,self.nptside,\
-            subs=subs,edge_tol=edge_tol,plot=False,refinement=ref)
+            subs=subs,edge_tol=edge_tol,plot=False,refinement=ref,input_knots=in_knots)
         # rescato los elementos del contorno en una variable aparte
         # OBS: self.bdry se actualiza mas adelante!
         self.bdry_elem = self.bdry[-1]
@@ -87,9 +90,6 @@ class Preprocess_Data_Type():
     """
     def PREESCRIPCION_CONDICIONES_CONTORNO(self):
         from bdrycond import order_boundary_list,boundary_condition_assignment
-
-
-
         import numpy as np
         
         # revisar 'order_boundary_list' para mas informacion sobre
@@ -296,7 +296,7 @@ class Preprocess_Data_Type():
         import matplotlib.pyplot as plt
 
         # create 'figure' and 'axis' matplotlib objects
-        fig,ax = plt.subplots(figsize=(10,8))
+        fig,ax = plt.subplots(figsize=(8,2))
         
         # formato fuente
         plt.rc('text',usetex=True)
@@ -307,14 +307,14 @@ class Preprocess_Data_Type():
 
         # axis settings
         xmax=max(x) ; xmin=min(x) ; ymax=max(y) ; ymin=min(y)
-        percent = 0.2 # 20%
-        dx=(xmax-xmin)*percent ; dy=(ymax-ymin)*percent 
-        ax.set_xlim(xmin-dx,xmax+dx)
-        ax.set_ylim(ymin-dy,ymax+dy)
-        ax.set_aspect('equal')
+        dx = xmax-xmin ; dy = ymax-ymin
+        ax.set_aspect(1)
+        offset = 0.4 # porcentaje
+        ax.set_xlim(xmin-dx*offset,xmax+dx*offset)
+        ax.set_ylim(ymin-dy*offset,ymax+dy*offset)
 
         # plot triangulation
-        plt.triplot(x,y,triangles=self.tri,color='gray',linestyle='-',linewidth=0.2)
+        ax.triplot(x,y,triangles=self.tri,color='gray',linestyle='-',linewidth=0.2)
 
         # plot domain pts
         ax.scatter(x,y,color='black')
@@ -328,10 +328,11 @@ class Preprocess_Data_Type():
             ax.plot(xline,yline,color='black',linestyle='--',linewidth='0.5') 
 
         # plot id pts
-        percent = 0.01 
-        dx=(xmax-xmin)*percent ; dy=(ymax-ymin)*percent 
-        for i in range(len(self.coord)):
-           ax.text(x[i]+dx,y[i]+dy,s=i+1,color='black') 
+        if ( len(x) < 100 ) :
+            percent = 0.01  
+            dx=(xmax-xmin)*percent ; dy=(ymax-ymin)*percent 
+            for i in range(len(self.coord)):
+               ax.text(x[i]+dx,y[i]+dy,s=i+1,color='black') 
 
         # extraer data ( diccionario a lista )
         aux = [] ; bdry_pts =[] ; bdry_coord = []
@@ -355,9 +356,8 @@ class Preprocess_Data_Type():
                 exit('ERROR: id contorno no registrada.')
             dict_cond[cond[i]].append(bdry_pts[i])
 
-            if ( cond[i] == 4 ) :
-                ax.quiver(xbdry[i],ybdry[i],xnorm[i],ynorm[i])
-            else:
+            # contornos que poseen condiciones de neumann
+            if ( cond[i]==1 or cond[i]==2 or cond[i]==4 ) :
                 ax.quiver(xbdry[i],ybdry[i],xnorm[i],ynorm[i])
                 
         for idcon in dict_cond:

@@ -116,14 +116,25 @@ def order_boundary_list(test):
     return priority_order_list
 
 
-def sub_boundary_side( test ):
+def additional_info( test ):
     # ingresa subcontornos en caso de haberlos
-    edge_tol = 1e-12
+    edge_tol   = 1e-12
     refinement = [0,0]
-    subs = [[],[],[],[]]
+    subs     = [[],[],[],[]]
     if ( test == 'infinite-plate' ):
         subs = [[],[0.5],[],[]]
         refinement = [0,0]
     return subs, edge_tol, refinement
+
+def input_knots( test , npts ):
+    from numpy import linspace,sin,pi
+    nx,ny = npts
+    uknots,vknots = [linspace(0.0,1.0,nx),linspace(0.0,1.0,ny)]
+    if (test=='infinite-plate'):
+        vknots = sin(linspace(-0.5*pi,0.5*pi,ny))
+        vknots = [ 0.5*(1.0+val) for val in vknots ]
+
+    return [uknots,vknots]
+
     
     

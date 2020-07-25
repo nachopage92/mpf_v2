@@ -118,15 +118,9 @@ def NURBS2D_MESHING(test,npts,**kwargs):
 
     #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::.
 
-    # COLLOCATION & SOURCE PTS IN PARAMETRIC SPACE
-    
-    # collocation pts
-    collocation_uknots = np.linspace(0.0,1.0,cnptx)
-    collocation_vknots = np.linspace(0.0,1.0,cnpty)
-    ## source pts
-    #source_uknots = np.linspace(0.0,1.0,snptx-1)
-    #source_vknots = np.linspace(0.0,1.0,snpty-1)
-    
+    # COLLOCATION PTS IN PARAMETRIC SPACE
+    collocation_uknots,collocation_vknots = kwargs.get('input_knots',\
+            [np.linspace(0.0,1.0,cnptx),np.linspace(0.0,1.0,cnpty)])
     
     #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::.
     
