@@ -297,7 +297,7 @@ module variables
           ! numero de puntos por nube: min & max
 
             ! OJO ACA
-          np = par%mmcloud(1) !numero maximo de puntos por nube
+          np = par%mmcloud(2) !numero maximo de puntos por nube
           clouds(i)%np_cloud = np
 
           clouds(i)%pts_list(:) = 0

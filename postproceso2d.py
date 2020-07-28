@@ -145,15 +145,27 @@ class Meshfree2d_Postproceso_Data():
                     tracc_i = (sx,sy,tau)_i            
     """
     class sol_type:
-        def __init__(self,displ_sol,tracc_sol):
-            displ = []
-            for u,v in displ_sol:
-                displ.append((u,v))
-            tracc = []
-            for sx,sy,tau in tracc_sol:
-                tracc.append((sx,sy,tau))
-            self.displ = displ
-            self.tracc = tracc
+        def __init__(self,sol_input1,sol_input2,problem_type):
+            if ( problem_type == 'linear-elastic'):
+                displ = []
+                for u,v in sol_input1:
+                    displ.append((u,v))
+                tracc = []
+                for sx,sy,tau in sol_input2:
+                    tracc.append((sx,sy,tau))
+                self.displ = displ
+                self.tracc = tracc
+
+            if ( problem_type == 'poisson'):
+                uapp = []
+                for u in sol_input1:
+                    uapp.append(u)
+                duapp = []
+                for sx,sy in sol_input2:
+                    duapp.append(sx,sy)
+                self.uapp = displ
+                self.duapp = tracc
+            
 
     # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -418,15 +430,21 @@ class Meshfree2d_Postproceso_Data():
         #    restx,resty = [ nxint%nxlim , nyint%nylim ]
         #    jumpx,jumpy = [ ceil(nxlim/restx) , ceil(nylim/resty) ]
 
-        PLOT_DISPLACEMENT(titulo,self.geometry.coord,self.solution.displ,\
-            new_tria,self.sol_aprox_export_filename[0],is_latex,self.show)
+        if ( self.problem_type == 'linear-elastic' ):
+            PLOT_DISPLACEMENT(titulo,self.geometry.coord,self.solution.displ,\
+                new_tria,self.sol_aprox_export_filename[0],is_latex,self.show)
+            #PLOT_DISPLACEMENT_VECTOR(titulo,self.geometry.coord,self.solution.displ,\
+            #    new_line,new_tria,self.sol_aprox_export_filename[2],is_latex,\
+            #    self.show)
+            PLOT_TRACTION(titulo,self.geometry.coord,self.solution.tracc,\
+                new_tria,self.sol_aprox_export_filename[1],is_latex,self.show)
 
-        #PLOT_DISPLACEMENT_VECTOR(titulo,self.geometry.coord,self.solution.displ,\
-        #    new_line,new_tria,self.sol_aprox_export_filename[2],is_latex,\
-        #    self.show)
+        if ( self.problem_type == 'poisson' ):
+            PLOT_SCALAR_SOLUTION(titulo,self.geometry.coord,self.solution.usol,\
+                new_tria,self.sol_aprox_export_filename[1],is_latex,self.show)
+            PLOT_SCALAR_SOLUTION(titulo,self.geometry.coord,self.solution.dusol,\
+                new_tria,self.sol_aprox_export_filename[1],is_latex,self.show)
 
-        PLOT_TRACTION(titulo,self.geometry.coord,self.solution.tracc,\
-            new_tria,self.sol_aprox_export_filename[1],is_latex,self.show)
 
         return
 
@@ -500,29 +518,63 @@ class Meshfree2d_Postproceso_Data():
 
         npoin = self.geometry.npoin
 
-        sol_list1=[] ; displ_sol=[]
-        for i in range(npoin):
-            idpt,u,v = file_as_lines[i+1].split()
-            idpt=int(idpt) ; u=float(u) ; v=float(v)
-            displ_sol.append( (u,v) )
-            sol_list1.append( idpt )
+        # solver linear-elastic
+        if (file_as_lines[0].split()[0]=='DESPLAZAMIENTOS'):
 
-        sol_list2=[] ; tracc_sol=[]
-        for i in range(npoin):
-            aux = file_as_lines[i+2+npoin].split()
-            idpt,sx,sy,tau = file_as_lines[i+2+npoin].split()
-            idpt=int(idpt) ; sx=float(sx) ; sy=float(sy) ; tau=float(tau)
-            tracc_sol.append( (sx,sy,tau) )
-            sol_list2.append( idpt )
+            self.problem_type = 'linear-elastic'
 
-        
-        if (sol_list1==sol_list2):
-            self.solution = self.sol_type(displ_sol,tracc_sol)
-        else:
-            print('LECTURA_SOLUCION: Error')
-            print(' sol_list1 =! sol_list2 ')
-            from sys import exit ; exit('Program stopped')
-            # NOTA: Esta situacion no deberia pasar!!
+            sol_list1=[] ; displ_sol=[]
+            for i in range(npoin):
+                idpt,u,v = file_as_lines[i+1].split()
+                idpt=int(idpt) ; u=float(u) ; v=float(v)
+                displ_sol.append( (u,v) )
+                sol_list1.append( idpt )
+    
+            sol_list2=[] ; tracc_sol=[]
+            for i in range(npoin):
+                aux = file_as_lines[i+2+npoin].split()
+                idpt,sx,sy,tau = file_as_lines[i+2+npoin].split()
+                idpt=int(idpt) ; sx=float(sx) ; sy=float(sy) ; tau=float(tau)
+                tracc_sol.append( (sx,sy,tau) )
+                sol_list2.append( idpt )
+
+            # asignacion a la variable global self
+            if (sol_list1==sol_list2):
+                self.solution = self.sol_type(displ_sol,tracc_sol,'linear-elastic')
+            else:
+                print('LECTURA_SOLUCION: Error')
+                print(' sol_list1 =! sol_list2 ')
+                from sys import exit ; exit('Program stopped')
+                # NOTA: Esta situacion no deberia pasar!!
+
+        # solver scalar
+        elif (file_as_lines[0].split()[0]=='U_APPROX'):
+
+            self.problem_type = 'poisson'
+
+            sol_list1=[] ; uapp=[]
+            for i in range(npoin):
+                idpt,u,v = file_as_lines[i+1].split()
+                idpt=int(idpt) ; u=float(u) 
+                uapp.append( u )
+                sol_list1.append( idpt )
+    
+            sol_list2=[] ; duapp=[]
+            for i in range(npoin):
+                aux = file_as_lines[i+2+npoin].split()
+                idpt,sx,sy = file_as_lines[i+2+npoin].split()
+                idpt=int(idpt) ; sx=float(sx) ; sy=float(sy)
+                duapp.append( (sx,sy) )
+                sol_list2.append( idpt )
+            
+            # asignacion a la variable global self
+            if (sol_list1==sol_list2):
+                self.solution = self.sol_type(uapp,duapp,'poisson')
+            else:
+                print('LECTURA_SOLUCION: Error')
+                print(' sol_list1 =! sol_list2 ')
+                from sys import exit ; exit('Program stopped')
+                # NOTA: Esta situacion no deberia pasar!!
 
         return
 
@@ -736,6 +788,108 @@ def PLOT_CLOUDS(title,idpt,coords,connect,filename,show):
     return
 
 
+def PLOT_SCALAR_SOLUTION(titulo,colloc_pts,displ_sol,triang,filename,is_latex,show):
+
+    # -----------  preambulo graficos -------------
+    import matplotlib.pyplot as plt # paquete MatPlotLib
+    import matplotlib.tri as mtri   # rutinas de triangulacion
+    from mpl_toolkits.mplot3d import Axes3D  # ejes 3d
+    from matplotlib import cm       # import color map
+    from numpy import array
+
+    # formato fuente (permite utilizar latex, e.g. r'\omega')
+    if (is_latex):
+        plt.rc('text', usetex=True)
+        plt.rc('font', family='serif')
+    
+    # colormap
+    cmap = cm.jet # jet es un mapa de color especifico, se puede cambiar
+    
+    # desempaquetar data
+    x,y=list(zip(*colloc_pts)) 
+    u,v = zip(*displ_sol)
+
+    # da formato a la triangulacion para ser utilizada por tricontourf
+    triangulacion =  mtri.Triangulation(x, y, triang)
+
+    # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    
+    # crea figura Matplotlib
+    fig = plt.figure(figsize=(10,6))
+    ax1 = fig.add_subplot(221) # u      
+    ax2 = fig.add_subplot(222) # v      
+    ax3 = fig.add_subplot(223,projection='3d') # u      
+    ax4 = fig.add_subplot(224,projection='3d') # v      
+
+    # genera titulo
+    fig.suptitle(titulo,fontsize=20)
+    
+    ## ------------ set limit  ---------------------
+    #tol = 1e-6
+
+    #zmin = min(u) ; zmax = max(u) ; ucoef=0.15
+    #if ( zmax-zmin < tol ):
+    #    if ( zmax-zmin == 0.0 ):
+    #        print('no se puede generar grafico de desplazamientos')
+    #        print('Solucion identicamente cero ; u(i)=0 para todo i')
+    #        return
+    #    ucoef = pow(zmax-zmin,-1.0)
+    #offset = (zmax-zmin)*ucoef
+    #ax3.set_zlim([zmin-offset,zmax+offset])
+
+    #zmin = min(v) ; zmax = max(v) ; vcoef=0.15
+    #if ( zmax-zmin < tol ):
+    #    if ( zmax-zmin == 0.0 ):
+    #        print('no se puede generar grafico de desplazamientos')
+    #        print('Solucion identicamente cero ; v(i)=0 para todo i')
+    #        return
+    #    vcoef = pow(zmax-zmin,-1.0)
+    #offset = (zmax-zmin)*vcoef
+    #ax4.set_zlim([zmin-offset,zmax+offset])
+    ## ----------------------------------------------
+
+    # 2D colourmap plot
+
+    # grafico 1
+    ax1.set_title(r'Desplazamiento $u$')
+    ax1.set_ylabel(r'$y$')
+    ax1.set_xlabel(r'$x$')
+    element1 = ax1.tricontourf(triangulacion, u, cmap=cmap)
+    ax1.xaxis.set_major_locator(plt.MaxNLocator(3))
+    fig.colorbar(element1,ax=ax1)
+    # grafico 2
+    ax2.set_title(r'Desplazamiento $v$')
+    ax2.set_ylabel(r'$y$')
+    ax2.set_xlabel(r'$x$')
+    element2 = ax2.tricontourf(triangulacion, v, cmap=cmap)
+    ax2.xaxis.set_major_locator(plt.MaxNLocator(3))
+    fig.colorbar(element2,ax=ax2)
+
+    # 3D plots
+
+    # grafico 3
+    ax3.set_ylabel(r'$y$')
+    ax3.set_xlabel(r'$x$')
+    ax3.plot_trisurf(triangulacion,u)
+    ax3.xaxis.set_major_locator(plt.MaxNLocator(3))
+    # grafico 4
+    ax4.set_ylabel(r'$y$')
+    ax4.set_xlabel(r'$x$')
+    ax4.plot_trisurf(triangulacion,v)
+    ax4.xaxis.set_major_locator(plt.MaxNLocator(3))
+
+    # exportar grafico como archivo
+    fig.savefig(filename)
+    
+    # muestra graficos del terminal
+    if (show):
+        plt.show()
+    # limpiar variables matplotlib
+    plt.cla()    # clear axis
+    plt.clf()    # clear figure
+    plt.close()  # close a figure windows
+    
+    return 
 
 
 def PLOT_DISPLACEMENT(titulo,colloc_pts,displ_sol,triang,filename,is_latex,show):
@@ -1051,6 +1205,283 @@ def PLOT_TRACTION(titulo,colloc_pts,tracc_sol,triang,filename,is_latex,show):
     
     return 
 
+
+
+
+"""
+    Analisis_de_Convergencia_y_Error
+"""
+def  Analisis_de_Convergencia_y_Error(test):
+
+    #   buscar archivos
+    from os import listdir
+    files = listdir('./DATOS/')
+    
+    # wildcards
+    from re import search
+    dat=[];elem=[];res=[];cld=[];shp=[];gen=[]
+    for filename in files:
+        if search(test+'.+'+'.dat', filename) : 
+            dat.append(filename)
+        #elif search(test+'.+'+'.elem', filename) : 
+        #    elem.append(filename)
+        #elif search(test+'.+'+'.res', filename) : 
+        #    res.append(filename)
+        #elif search(test+'.+'+'.CLD', filename) : 
+        #    cld.append(filename)
+        #elif search(test+'.+'+'.SF', filename) : 
+        #    shp.append(filename)
+        #elif search(test+'.+'+'.GEN', filename) : 
+        #    gen.append(filename)
+
+
+    # ordenar data
+    npts=[] ; forsort=[]
+    for name in dat:
+        npt=name.split('_')[-1].split('.')[0]
+        npts.append(npt)
+        forsort.append(int(npt.split('-')[0]))
+    ndat = len(npts)
+    ranking = [ sorted(forsort).index(x) for x in forsort ]     
+    new_npts = [ 0 for i in range(ndat) ]
+    for i in range(ndat):
+        new_npts[ranking[i]] = npts[i]
+    npts = new_npts
+
+    # calcular error global
+    for npt in npts:
+        data = Meshfree2d_Postproceso_Data(test,npt,None,None,None,None,None)
+        print(data.ERROR_GLOBAL)
+
+    input()
+    
+
+
+
+
+
+
+
+    for test in tests:
+    
+        if ( test in self.linear_elastic_test() ):
+            self.soltype = 'linear-elastic'
+            
+        if ( test in self.poisson_test() ):
+            self.soltype = 'poisson'
+    
+        for caso in self.casos:
+            self.Crear_Elementos_Matplotlib()
+            for shpfcn in self.shpfcns:
+    # ::::::::::::::::::::::::::::::::::::::::::::
+                self.error = []
+                for npt in self.npts:
+                    data=Meshfree2d_Postproceso_Data(test,shpfcn,npt,self.soltype,caso=caso)
+                    data.ERROR_GLOBAL();self.error.append(data.error)
+                    print(self.error)
+                sol_approx = self.sort_error_data()
+                self.Graficar_Convergencia(test,caso,data.shpfcn,data.shp_param,sol_approx)
+    
+            self.Exportar_Graficos()    # grafica convergencia multiples shp para
+                                        # npt variable para cada test y caso
+    return
+    
+
+    ## ::::::::::::::::::::::::::::::::::::::::::::
+    #def sort_error_data(self):
+
+    #    # iniciar variables
+    #    if (self.soltype=='linear-elastic'):
+    #        dc=[];u=[];v=[];epsxx=[];epsxy=[];epsyy=[];sigmax=[];sigmay=[];tauxy=[]
+    #    if (self.soltype=='poisson'):
+    #        dc=[];u=[];dudx=[];dudy=[]
+
+    #    from numpy import array,argsort,append
+    #    for dat in self.error:
+
+    #        if (self.soltype=='linear-elastic'):
+    #            dc.append(dat['dc']);u.append(dat['u']);v.append(dat['v'])
+    #            epsxx.append(dat['epsxx']);epsxy.append(dat['epsxy']);epsyy.append(dat['epsyy'])
+    #            sigmax.append(dat['sigmax']);sigmay.append(dat['sigmay']);tauxy.append(dat['tauxy'])
+    #            dc=array(dc);u=array(u);v=array(v)
+    #            epsxx=array(epsxx);epsxy=array(epsxy);epsyy=array(epsyy)
+    #            sigmax=array(sigmax);sigmay=array(sigmay);tauxy=array(tauxy)
+    #            sort = argsort(dc) # sorting / ranking
+    #            dc=dc[sort];u=u[sort];v=v[sort]
+    #            epsxx = epsxx[sort];epsxy = epsxy[sort];epsyy = epsyy[sort]
+    #            sigmax = sigmax[sort];sigmay = sigmay[sort];tauxy  = tauxy[sort] 
+    #            return [dc,u,v,epsxx,epsxy,epsyy,sigmax,sigmay,tauxy]
+
+    #        if (self.soltype=='poisson'):
+    #            dc.append(dat['dc']);u.append(dat['u']);dudx.append(dat['dudx']);dudy.append(dat['dudy'])
+    #            dc=array(dc);u=array(u);dudx=array(dudx);dudy=array(dudy)
+    #            sort = argsort(dc) # sorting / ranking
+    #            dc=dc[sort];u=u[sort];dudx=dudx[sort];dudy=dudy[sort]
+    #            return [dc,u,dudx,dudy]
+    #            
+    #    # ::::::::::::::::::::::::::::::::::::::::::::
+
+    #def Crear_Elementos_Matplotlib(self):
+    #    # ::::::::::::::::::::::::::::::::::::::::::::
+    #    import matplotlib.pyplot as plt # paquete MatPlotLib
+    #    # formato fuente (permite utilizar latex, e.g. r'\omega')
+    #    plt.rc('text', usetex=True)
+    #    plt.rc('font', family='serif')
+    #    if ( self.soltype == 'linear-elastic' ):
+    #        fig=plt.figure(figsize=(16,8))
+    #        #fig.suptitle(r'Convergencia error')
+    #        ax1 = fig.add_subplot(2,4,1)
+    #        ax2 = fig.add_subplot(2,4,2)
+    #        ax3 = fig.add_subplot(2,4,3)
+    #        ax4 = fig.add_subplot(2,4,4)
+    #        ax5 = fig.add_subplot(2,4,5)
+    #        ax6 = fig.add_subplot(2,4,6)
+    #        ax7 = fig.add_subplot(2,4,7)
+    #        ax8 = fig.add_subplot(2,4,8)
+    #        ax1.set_yscale('log')
+    #        ax2.set_yscale('log')
+    #        ax3.set_yscale('log')
+    #        ax4.set_yscale('log')
+    #        ax5.set_yscale('log')
+    #        ax6.set_yscale('log')
+    #        ax7.set_yscale('log')
+    #        ax8.set_yscale('log')
+    #        ax1.set_ylabel=(r'\varepsilon_u')
+    #        axs = [ax1,ax2,ax3,ax4,ax5,ax6,ax7,ax8] 
+    #    elif ( self.soltype == 'poisson' ):
+    #        fig=plt.figure(figsize=(16,8))
+    #        #fig.suptitle(r'Convergencia error')
+    #        ax1 = fig.add_subplot(1,3,1)
+    #        ax2 = fig.add_subplot(1,3,2)
+    #        ax3 = fig.add_subplot(1,3,3)
+    #        axs = [ax1,ax2,ax3]
+    #    self.conv_fig = fig
+    #    self.conv_axs = axs
+    #    return 
+
+    #def Graficar_Convergencia(self,test,caso,shp,params,sol_approx):
+    #    fig = self.conv_fig
+    #    if ( self.soltype == 'linear-elastic' ):
+    #        ax1,ax2,ax3,ax4,ax5,ax6,ax7,ax8 = self.conv_axs
+    #        dc,u,v,epsxx,epsxy,epsyy,sigmax,sigmay,tauxy = sol_approx
+    #        ax1.scatter(dc,u,label=shp)
+    #        ax1.plot(dc,u)
+    #        ax2.scatter(dc,v,label=shp)
+    #        ax2.plot(dc,v)
+    #        ax3.scatter(dc,epsxx,label=shp)
+    #        ax3.plot(dc,epsxx)
+    #        ax4.scatter(dc,epsxy,label=shp)
+    #        ax4.plot(dc,epsxy)
+    #        ax5.scatter(dc,epsyy,label=shp)
+    #        ax5.plot(dc,epsyy)
+    #        ax6.scatter(dc,sigmax,label=shp)
+    #        ax6.plot(dc,sigmax)
+    #        ax7.scatter(dc,sigmay,label=shp)
+    #        ax7.plot(dc,sigmay)
+    #        ax8.scatter(dc,tauxy,label=shp)
+    #        ax8.plot(dc,tauxy)
+    #    elif ( self.soltype == 'poisson' ):
+    #        ax1,ax2,ax3 = self.conv_axs
+    #        dc,u,dudx,dudy = sol_approx
+    #        ax1.scatter(dc,u)
+    #        ax2.scatter(dc,dudx)
+    #        ax3.scatter(dc,dudy)
+    #    return
+
+    #def Exportar_Graficos(self):
+    #    import matplotlib.pyplot as plt # paquete MatPlotLib
+    #    if ( self.soltype == 'linear-elastic' ):
+    #        ax1,ax2,ax3,ax4,ax5,ax6,ax7,ax8 = self.conv_axs
+    #        ax1.legend();ax2.legend();ax3.legend();ax4.legend()
+    #        ax5.legend();ax6.legend();ax7.legend();ax8.legend()
+    #    elif ( self.soltype == 'poisson' ):
+    #        ax1,ax2,ax3 = self.conv_axs
+    #        ax1.legend();ax2.legend();ax3.legend()
+    #    # mostrar grafico
+    #    self.conv_fig.tight_layout()
+    #    self.conv_fig.show()
+    #    # limpiar variables matplotlib
+    #    plt.savefig('./provi.svg')
+    #    plt.cla()    # clear axis
+    #    plt.clf()    # clear figure
+    #    plt.close()  # close a figure windows
+    #    return
+
+    #def linear_elastic_test(self):
+    #    return ['patchtest-1','patchtest-2','cantilever','infinite-plate']
+
+    #def poisson_test(self):
+    #    return ['local-sources','poisson-test1','poisson-test2']
+
+    #def CONVERGENCIA_2D(self):
+
+    #    
+
+    #    # :::::::::::: crear elementos :::::::::::::::
+    #    for test in self.tests:
+
+    #        if ( test in self.linear_elastic_test() ):
+    #            self.soltype = 'linear-elastic'
+    #            
+    #        if ( test in self.poisson_test() ):
+    #            self.soltype = 'poisson'
+
+    #        for caso in self.casos:
+    #            self.Crear_Elementos_Matplotlib()
+    #            for shpfcn in self.shpfcns:
+    #    # ::::::::::::::::::::::::::::::::::::::::::::
+    #                self.error = []
+    #                for npt in self.npts:
+    #                    data=Meshfree2d_Postproceso_Data(test,shpfcn,npt,self.soltype,caso=caso)
+    #                    data.ERROR_GLOBAL();self.error.append(data.error)
+    #                    print(self.error)
+    #                sol_approx = self.sort_error_data()
+    #                self.Graficar_Convergencia(test,caso,data.shpfcn,data.shp_param,sol_approx)
+
+    #            self.Exportar_Graficos()    # grafica convergencia multiples shp para
+    #                                        # npt variable para cada test y caso
+    #    return
+    #
+    #        
+    ##        self.convergencia = {} 
+    ##        self.geometria = {}
+    ##        
+    ##        for test in tests:
+    ##            aux3 = {} # almacena data segun numero caso
+    ##            for caso in casos:
+    ##                aux2 = {'hcar':[],'npoint':[]} # almacena data segun numero de puntos
+    ##                for npt in npts:
+    ##                
+    ##                    # calculo de la solucion exacta a partir de los puntos de discretizacion
+    ##                    geometry,sol_exact,hcar = calculo_solucion_exacta()
+    ##                    
+    ##                    # filename es el nombre dle archivo que contiene el resultado del test
+    ##                    filename = [test,caso,npt]
+    ##                    filename = '_'.join(filename)
+    ##                    filename = '../../DATOS/test2d/sol_aprox/'+filename+'_results.dat'
+    ##                    sol_aprox = LECTURA_SOLUCION(filename,self.sol_type) # lectura de la solcuion
+    ##                    auxcoord = {npt:geometry}
+    ##                    
+    ##                    aux1 = {}
+    ##                    error_measure = kwargs.get('error_measure','promedio')
+    ##                    for shp in ['lme','fwls']: # funciones de forma disponibles
+    ##                            aux1[shp] =     error_global(sol_exact,sol_aprox[shp],error_measure)
+    ##                    
+    ##                    aux2[npt]    = aux1
+    ##                    aux2['hcar'].append(hcar)
+    ##                    aux2['npoint'].append(len(geometry))
+    ##                    
+    ##                # almacenar data en variable auxiliar
+    ##                aux3[caso] = aux2
+    ##                
+    ##            self.convergencia['measure_type'] = error_measure
+    ##            self.convergencia[test] = aux3
+    ##            self.geometria[test]    = auxcoord
+
+#///////////////////////////////////////////
+
+
+
 #::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::
 
@@ -1075,12 +1506,17 @@ parser.add_argument('-fmt','--format',help="(str) formato de salida figuras gene
 # lectura argumentos
 args = parser.parse_args()
 
-#  Utilizar clase Mesfree2d_Postproceso_Data que contienen
-# todas las rutinas (almacenadas como metodos en python3).
-# Las funciones habilitadas se encuentran contenidas en el
-#  diccionario FUNCTION_MAP 
-DATA = Meshfree2d_Postproceso_Data(args.test,args.npts,\
-    args.young,args.poisson,args.plot,args.show,args.format)
-
-# call function
-DATA.DRIVER(args.func)
+if ( args.func == "Convergencia" ):
+    # -----------------------------------------
+    # -----------------------------------------
+    Analisis_de_Convergencia_y_Error(args.test)
+else:
+    #  Utilizar clase Mesfree2d_Postproceso_Data que contienen
+    # todas las rutinas (almacenadas como metodos en python3).
+    # Las funciones habilitadas se encuentran contenidas en el
+    #  diccionario FUNCTION_MAP 
+    DATA = Meshfree2d_Postproceso_Data(args.test,args.npts,\
+        args.young,args.poisson,args.plot,args.show,args.format)
+    
+    # call function
+    DATA.DRIVER(args.func)

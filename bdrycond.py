@@ -101,12 +101,11 @@ def order_boundary_list(test):
         #            I
         priority_order_list = [ 0 , 1 , 2 , 3 ]
     elif ( test=='infinite-plate'):
-        #    _______III______       en I   : preesc. v=0 y dot(sigma,n)_x = tx
-        # IV |               |      en II  : preesc. dot(sigma,n) = traction
-        #    --\             |II    en III : preesc. dot(sigma,n) = traction
-        #     V |____________|      en IV  : preesc. u=0 y dot(sigma,n)_y = ty
-        #                           en V   : preesc. dot(sigma,n) = traction 
-        #            I
+        #    ___III___       en I   : preesc. v=0 y dot(sigma,n)_x = tx
+        # IV |       |      en II  : preesc. dot(sigma,n) = traction
+        #    --\     |II    en III : preesc. dot(sigma,n) = traction
+        #     V |____|      en IV  : preesc. u=0 y dot(sigma,n)_y = ty
+        #         I         en V   : preesc. dot(sigma,n) = traction 
         priority_order_list = [ 4 , 2 , 1 , 0 , 3 ]
     else:
         print(' order_boundary_list(): ')

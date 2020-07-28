@@ -474,15 +474,3 @@ def normales(xcoord,linelem,nnorm,nnod):
 #        pass
 
 #::::::::::::::::::::::::::::::::
-
-# PLOT CONVHULL
-
-    # --------------------------------------------------------------------
-
-    #   grafica de convex hull
-    #points = np.array(parametrical_pts)
-    #fig = plt.figure(figsize=(10,6))
-    #plt.plot(points[:,0], points[:,1], 'o')
-    #for simplex in convhull.simplices:
-    #    plt.plot(points[simplex, 0], points[simplex, 1], 'k-')
-    #plt.show()

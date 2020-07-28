@@ -49,7 +49,6 @@ class Preprocess_Data_Type():
         self.string_npts = nptside
         aux = nptside.split('-') 
         self.nptside = [ int(aux[0]) , int(aux[1]) ]  # numero de puntos por lado
-        self.show    = show     # mostrar graficos en terminal interactiva
         self.plot    = plot     # exporta figuras en ../GRAFICOS/test2d/
         self.formato = kwargs.get('formato','.svg')
         
@@ -59,6 +58,12 @@ class Preprocess_Data_Type():
         # directorios de salida
         self.data_dir = "./DATOS/"
         self.plot_dir = "./GRAFICOS/PREPROCESO/"
+
+        # mostrar graficos en terminal interactiva
+        self.show = False
+        if ( show != None ):
+            if ( show.lower() == 'true' ):
+                self.show = True
 
     """
         DISCRETIZACION DEL DOMINIO
@@ -296,7 +301,7 @@ class Preprocess_Data_Type():
         import matplotlib.pyplot as plt
 
         # create 'figure' and 'axis' matplotlib objects
-        fig,ax = plt.subplots(figsize=(8,2))
+        fig,ax = plt.subplots(figsize=(8,6))
         
         # formato fuente
         plt.rc('text',usetex=True)
@@ -376,7 +381,7 @@ class Preprocess_Data_Type():
                 os.mkdir(self.plot_dir)
 
         if (self.plot):
-            export_file = self.plot_dir+self.test+self.formato
+            export_file = self.plot_dir+self.test+'_'+self.string_npts+self.formato
             fig.savefig(export_file)
             print('Figura exportada: '+export_file)
 
@@ -454,4 +459,3 @@ if ( args.plot.lower()=="true" or args.show.lower()=="true" ):
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-

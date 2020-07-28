@@ -64,7 +64,7 @@ def SOLUCION_EXACTA(test,x,y,**kwargs):
         return u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy
         
     elif (test=='cantilever'): # viga en voladizo
-        Lx = 8.0   ; Ly = 1.0
+        Lx = 4.0   ; Ly = 1.0
         P = 1000.0 ; I = 1.0*Ly*Ly*Ly/12.0
         c = Ly/2.0 ; G = 2.0*young/(1.0+poisson)
         # cambio de variables
