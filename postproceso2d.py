@@ -103,7 +103,8 @@ class Meshfree2d_Postproceso_Data():
         mapping = {'PLOT_SOL_APROX':self.GRAFICAR_SOLUCION_NUMERICA_TEST2D,\
                    'PLOT_SOL_EXACT':self.GRAFICAR_SOLUCION_EXACTA_TEST2D,\
                    'ERROR_GLOBAL':self.ERROR_GLOBAL,\
-                   'PLOT_CLOUD':self.GRAFICAR_NUBES}
+                   'PLOT_CLOUD':self.GRAFICAR_NUBES,\
+                   'PLOT_SF':self.GRAFICAR_FUNCION_FORMA}
                    #'ERROR_LOCAL':self.ERROR_LOCAL} # pendiente
                     
         return mapping
@@ -359,6 +360,38 @@ class Meshfree2d_Postproceso_Data():
         
         # importar datos de la nube de puntos
         self.IMPORTAR_NUBES()
+        self.LECTURA_DATA()
+        self.LECTURA_ELEMENTOS()
+
+        # mostrar 'n_of_figures' funciones de forma 
+        # (son muchos datos para graficar!)
+        n_of_figures = 10
+        npoin=len(self.geometry.coord)
+
+        #steps=int(npoin/n_of_figures)#        <---------------------
+        steps = 1 # grafica todas las func. de forma
+
+        from os import path,makedirs
+        if not path.exists(self.nubes_figure_folder):
+            makedirs(self.nubes_figure_folder)
+
+        for j in range(0,npoin,steps):
+            cld = self.nubes[j]
+            for i in range(len(cld)): # enumeracion de python
+                cld[i] = cld[i] - 1   # parte de cero
+            title = r'Nube de proximidad, nodo estrella '+str(j+1)+', test '+self.test
+            PLOT_CLOUDS(title,j,self.geometry.coord,cld,self.cloud_figure,self.show)
+        
+        return
+    
+    """
+        GRAFICAR_NUBES:
+        Rutina principal que lee las nubes y las grafica
+    """
+    def GRAFICAR_FUNCION_FORMA(self):
+        
+        # importar datos de la nube de puntos
+        self.IMPORTAR_NUBES()
         self.IMPORTAR_FUNCION_DE_FORMA()
         self.LECTURA_DATA()
         self.LECTURA_ELEMENTOS()
@@ -372,10 +405,8 @@ class Meshfree2d_Postproceso_Data():
         steps = 1 # grafica todas las func. de forma
 
         from os import path,makedirs
-        folders = [self.nubes_figure_folder,self.shape_figure_folder]
-        for folder in folders:
-            if not path.exists(folder):
-                makedirs(folder)
+        if not path.exists(self.shape_figure_folder):
+            makedirs(self.shape_figure_folder)
 
         for j in range(0,npoin,steps):
             cld = self.nubes[j]
@@ -383,11 +414,9 @@ class Meshfree2d_Postproceso_Data():
             for i in range(len(cld)): # enumeracion de python
                 cld[i] = cld[i] - 1   # parte de cero
             title = r'Nube de proximidad, nodo estrella '+str(j+1)+', test '+self.test
-            PLOT_CLOUDS(title,j,self.geometry.coord,cld,self.cloud_figure,self.show)
             PLOT_SHAPES(title,j,self.geometry.coord,cld,phi,self.shpfcn_figure,self.show)
         
         return
-    
 
     
     """
@@ -673,7 +702,7 @@ def PLOT_SHAPES(title,idpt,coords,connect,phi,filename,show):
     plt.rc('font', family='serif')
 
     # crear figura NUBE
-    fig=plt.figure(num=None,figsize=(8,6),dpi=80,facecolor='w',edgecolor='k')
+    fig=plt.figure(num=None,figsize=(12,8),dpi=80,facecolor='w',edgecolor='k')
     title += r", idpt="+str(idpt+1)
     fig.suptitle(title, fontsize=12)
 
@@ -767,6 +796,9 @@ def PLOT_CLOUDS(title,idpt,coords,connect,filename,show):
     cnvx_coords.append(cld_coords[cnvx.vertices[0]])
     xcnvx,ycnvx=zip(*cnvx_coords)
     ax.plot(xcnvx,ycnvx)
+    
+    # relacion de aspecto ejes x,y
+    ax.set_aspect('equal')
 
     # distancia entre graficos
     fig.tight_layout()

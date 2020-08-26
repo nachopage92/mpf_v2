@@ -35,15 +35,16 @@ def boundary_condition_assignment(test,lado,pt):
         if ( pt==0 ): # vertice de simetria (0,0)
             cond = 3  #   -> both_uv_displacement
     elif ( test=='cantilever' ):
-        ## ------ segun lado ------ ##
-        if ( lado == 0 ):   # borde inferior 
-            cond = 4       #   -> tau_traction (zero)
-        elif ( lado == 1 ): # borde derecho
-            cond = 4       #   -> tau_traction
-        elif ( lado == 2 ): # borde superior 
-            cond = 4       #   -> tau_traction (zero)
-        elif ( lado == 3 ): # borde izquierdo
-            cond = 3       #   -> uv_displacement
+        ### ------ segun lado ------ ##
+        #if ( lado == 0 ):   # borde inferior 
+        #    cond = 4       #   -> tau_traction (zero)
+        #elif ( lado == 1 ): # borde derecho
+        #    cond = 4       #   -> tau_traction
+        #elif ( lado == 2 ): # borde superior 
+        #    cond = 4       #   -> tau_traction (zero)
+        #elif ( lado == 3 ): # borde izquierdo
+        #    cond = 3       #   -> uv_displacement
+        cond = 3
     elif ( test=='infinite-plate' ):
         if ( lado == 0):
             cond = 2

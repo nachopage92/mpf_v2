@@ -31,10 +31,10 @@ punto2: $(obj_punto2) $(obj_maxent) $(obj_maxent_v2)
 	$(f90comp) -o punto2 $(FLAG) $(obj_maxent) $(obj_maxent_v2) $(obj_punto2) $(DEFS)
 
 punto3: $(obj_punto3) $(obj_maxent) $(obj_maxent_v2)
-	$(f90comp) -o punto2 $(FLAG) $(obj_maxent) $(obj_maxent_v2) $(obj_punto3) $(DEFS)
+	$(f90comp) -o punto3 $(FLAG) $(obj_maxent) $(obj_maxent_v2) $(obj_punto3) $(DEFS)
 
 punto4: $(obj_punto4) $(obj_maxent) $(obj_maxent_v2)
-	$(f90comp) -o punto2 $(FLAG) $(obj_maxent) $(obj_maxent_v2) $(obj_punto4) $(DEFS)
+	$(f90comp) -o punto4 $(FLAG) $(obj_maxent) $(obj_maxent_v2) $(obj_punto4) $(DEFS)
 
 genclouds: $(obj_cloud)
 	$(f90comp) -o genclouds $(FLAG) $(obj_cloud)

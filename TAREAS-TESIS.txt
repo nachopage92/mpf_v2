@@ -1,0 +1,33 @@
+cantilever:
+    cambiar dirichlet los 4 contornos
+    analizar convergencia
+    ir agregando neumann de a 1cantilever: 
+    cambiar dirichlet los 4 contornos
+    analizar convergencia
+
+infinite:
+    rescatar solucion u,v   - >> coordenadas polares
+
+test NAFEMS:
+    IC1
+
+corroborar con FEM:
+    code_aster
+    freefem
+    FEniCS
+    openFoam
+
+------------------------------------------------------
+
+generacion de nubes ...
+balancear nubes ...
+    cómo balancear?
+        nubes cuadradas
+        nubes circulares
+        nubes por cercania
+        nubes por triangulacion
+
+
+paper perazo rainald lpp ----- recortar nubes contorno
+
+

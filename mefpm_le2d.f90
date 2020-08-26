@@ -665,8 +665,8 @@ program Finite_Point_Method_Solver
                RM(1:NCONS,1:MAXCLD,i) = RM_FWLS(1:NCONS,1:MAXCLD,i) 
             else ! pertenece al interior
                !RM(1:NCONS,1:MAXCLD,i) = RM_MaxEnt(1:NCONS,1:MAXCLD,i) 
-               RM(1:NCONS,1:MAXCLD,i) = RM_MaxEnt_simple(1:NCONS,1:MAXCLD,i) 
-               !RM(1:NCONS,1:MAXCLD,i) = RM_FWLS(1:NCONS,1:MAXCLD,i) 
+               !RM(1:NCONS,1:MAXCLD,i) = RM_MaxEnt_simple(1:NCONS,1:MAXCLD,i) 
+               RM(1:NCONS,1:MAXCLD,i) = RM_FWLS(1:NCONS,1:MAXCLD,i) 
             end if
             !print*, 'inod (nodo estrella) = ',i  ;   print*,'phi:'
             !print*, RM(1,:,i)                    ;   print*, ''
