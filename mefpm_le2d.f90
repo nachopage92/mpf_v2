@@ -657,8 +657,8 @@ program Finite_Point_Method_Solver
         character(len=15) :: formato
         character(len=100) :: cldfile
         CALL N_DN_D2N_FWLS
-        !CALL N_DN_D2N_MaxEnt
-        CALL N_DN_D2N_MaxEnt_simple
+        CALL N_DN_D2N_MaxEnt
+        !CALL N_DN_D2N_MaxEnt_simple
         allocate( RM(NCONS,MAXCLD,NNOD) ) ; RM=0.d0
         do i = 1,nnod
             if ( any( i .eq. inorm_node) ) then ! pertenece al contorno : fwls
@@ -704,7 +704,7 @@ program Finite_Point_Method_Solver
         ! NOTA : DMAX calculado anteriormente en N_DN_D2N
 
                                     ! OPCIONES DISPONIBLES:
-        scheme = 'newton'           ! descent,lbfgs,newton
+        scheme  = 'newton'          ! descent,lbfgs,newton
         priorwt = 'gaussian-rbf'    ! uniform,cubi,quartic,gaussian,gaussian-rbf
 
         eps    = 1.d-14      ! convergence tolerance 

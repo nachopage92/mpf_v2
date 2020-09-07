@@ -353,42 +353,58 @@ module variables
     subroutine GENERAR_NUBES_V1   ! utiliza algoritmo 'fuerza bruta'
         use m_mrgrnk
         implicit none
-        real*8,allocatable  :: dist(:,:),xyz(:)
-        integer,allocatable :: list(:,:)
-        real*8 diff(2)
-        integer npoin,n,i,j,npmax,npmin,np,criterio
+        real*8 xdis(2),diff(2),normal(2),right_lim,left_lim,up_lim,&
+                &down_lim,right_offset,left_offset,up_offset,down_offset,&
+                &add_left,add_right,add_up,add_down
+        real*8,allocatable  :: dist(:,:),xyz(:),normaux(:,:)
+        integer,allocatable :: list(:,:),list_cld(:),dist_cld(:)
+        integer npoin,n,i,j,k,npmax,npmin,np,criterio,cont
+        character(len=100) :: selector
+        logical :: isotropic
 
         ! preambulo
         n = geometry%npoin
         if ( allocated(clouds) ) deallocate(clouds) ! despejar memoria
         allocate( clouds(n) )
         if (par%mmcloud(2).gt.geometry%npoin) par%mmcloud(2)=geometry%npoin ! <-- Tener en consideracion
+        ! reconocer direccion del vector normal
+        allocate(normaux(n,2));normaux=0
+        do j=1,size(boundaries%perm)
+            normaux(boundaries%perm(j),1:2) = boundaries%pts_norm(1:2,j)
+        end do
 
-        criterio = 1        
 
+        criterio = 3
         ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
         ! ALGORITMO FUERZA BRUTA
 
         allocate(dist(n,n)) ; dist=0
-        do i = 1,n            ! loop sobre cada punto de colocacion
-          do j = 1,n               ! loop sobre cada punto fuente
-            diff = geometry%coord(1:2,i) - geometry%coord(1:2,j)
-            dist(i,j) = sqrt(dot_product(diff,diff))
-          end do
-        end do
-
-        allocate(list(n,n))
-        do i = 1,n
-          call mrgrnk(dist(i,:),list(i,:))
-        end do
-
-        ! :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-
+        allocate(list(n,n)) ; list=0
+        allocate(list_cld(n),dist_cld(n))
+        
         ! 1. NP FIJO, SEGUN CERCANIA
         IF ( CRITERIO .EQ. 1 ) THEN
 
             do i=1,n
+
+                ! 1.1. algoritmo de fuerza bruta: calcula la distancia de cada
+                ! punto del dominio respecto a cada punto estrella. Utilizando
+                ! la subrutina MRGRNK orden la lista de puntos segun distancia
+                ! ascendente
+                do j = 1,n               ! loop sobre cada punto fuente
+                  diff(1) = geometry%coord(1,i) - geometry%coord(1,j)
+                  diff(2) = geometry%coord(2,i) - geometry%coord(2,j)
+                  dist(i,j) = sqrt(dot_product(diff(1:2),diff(1:2)))
+                end do
+
+                ! ordenar datos de menor a mayor distancia
+                call mrgrnk(dist(i,1:n),list(i,1:n))
+
+                ! distancia internodal caracteristica
+                clouds(i)%hcar(1) = dist(i,2) ! primer punto mas cercano respecto al n.estrella
+                clouds(i)%hcar(2) = dist(i,2) ! primer punto mas cercano respecto al n.estrella
+
                 ! 1.1. numero de puntos por nube
                 np = par%mmcloud(2) !   OBSERVACION : 
                                     ! par%mmcloud(2) = max npt 
@@ -404,10 +420,6 @@ module variables
                 clouds(i)%pts_list(:)=0   ; clouds(i)%pts_list(1:np) = list(i,1:np)
                 clouds(i)%pts_dist(:)=0d0 ; clouds(i)%pts_dist(1:np) = dist(i,list(i,1:np))
 
-                ! 1.4. distancia internodal caracteristica (hcar)
-                clouds(i)%hcar = dist(i,2) ! primer punto mas cercano respecto al n.estrella
-                !clouds(i)%hcar = dist(i,3) ! segundo punto mas cercano respecto al n.estrella
-
             end do
 
 
@@ -418,8 +430,139 @@ module variables
 
         !   3. FORMA DESCRITA: RECTANGULO
         ELSE IF ( CRITERIO .EQ. 3 ) THEN
-            
-            print*, 'criterio 3 pendiente'
+
+            ! numero de puntos maximos (npx*npy)
+            npmax = np
+
+            right_offset = 0.05d0 ! 5%
+            left_offset  = 0.05d0
+            up_offset    = 0.05d0
+            down_offset  = 0.05d0
+
+            ! creacion de nubes rectangulares
+            do i = 1,n ! punto de colocacion
+
+                ! 3.1. Definir posicion del nodo: interior, contorno, vertice
+                if ( .not. (any(i.eq.geometry%line_m)) ) then
+                    selector = 'interior'
+                else
+                    selector = 'contorno'
+                end if
+
+                do j = 1,n
+                  diff(1) = geometry%coord(1,i) - geometry%coord(1,j) !pt-estrella-pt.cercano
+                  diff(2) = geometry%coord(2,i) - geometry%coord(2,j)
+                  dist(i,j) = sqrt(dot_product(diff(1:2),diff(1:2)))
+                end do
+
+                ! ordenar datos de menor a mayor distancia
+                call mrgrnk(dist(i,1:n),list(i,1:n))
+
+                ! distancia internodal
+                clouds(i)%hcar(1) = dist(i,list(i,2))
+                clouds(i)%hcar(2) = dist(i,list(i,2))
+
+                ! 3.2. offset, limites de la nube
+                right_lim = geometry%coord(1,i)+clouds(i)%hcar(1)*(1.0d0+right_offset)
+                left_lim  = geometry%coord(1,i)-clouds(i)%hcar(1)*(1.0d0+left_offset)
+                up_lim    = geometry%coord(2,i)+clouds(i)%hcar(2)*(1.0d0+up_offset)
+                down_lim  = geometry%coord(2,i)-clouds(i)%hcar(2)*(1.0d0+down_offset)
+
+                ! ::::::::::::::: puntos interiores :::::::::::::::::::::
+                if ( trim(selector) .eq. 'interior' ) then
+                    np = 0 ; list_cld = 0
+                    do j = 1,n ! punto funetes
+                        diff(1) = geometry%coord(1,i) - geometry%coord(1,j) ! coord x 
+                        diff(2) = geometry%coord(2,i) - geometry%coord(2,j) ! coord y
+                        if (  geometry%coord(1,j) .ge. left_lim  .and.&
+                            & geometry%coord(1,j) .le. right_lim .and.&
+                            & geometry%coord(2,j) .ge. down_lim  .and.&
+                            & geometry%coord(2,j) .le. up_lim )  then
+                            np = np + 1
+                            dist_cld(np) = j
+                        end if
+                    end do
+
+                    ! ordena de menor a mayor
+                    call mrgrnk(dist(i,dist_cld(1:np)),list_cld(1:np))
+
+                    ! 1.2. asignar memoria
+                    allocate(clouds(i)%pts_dist(np))
+                    allocate(clouds(i)%inv_pts_dist(np))
+                    allocate(clouds(i)%pts_list(np))
+
+                    ! 1.3. definir variables globales
+                    clouds(i)%np_cloud = np
+                    clouds(i)%pts_list(:)=0   ; clouds(i)%pts_list(1:np) = dist_cld(list_cld(1:np))
+                    clouds(i)%pts_dist(:)=0d0 ; clouds(i)%pts_dist(1:np) = dist(i,dist_cld(list_cld(1:np)))
+
+
+                ! :::::::::::::::::::::: contorno ::::::::::::::::::::::::::::
+                else if ( trim(selector) .eq. 'contorno' ) then
+
+                    normal(1:2) = normaux(i,1:2)
+                    
+                    ! extender limites
+                    !-------------------------------
+                    !   cos(l) > 0  :  +1.0 right 
+                    !   cos(l) < 0  :  -1.0 left
+                    if ( normal(1).gt.0 ) then
+                        add_right = 0.0d0 ; add_left = -1.0d0 
+                    else if ( normal(1).lt.0 ) then
+                        add_right = 1.0d0 ; add_left = 0.0d0 
+                    else ! normal(1)=0
+                        add_right = 0.0d0 ; add_left = 0.0d0 
+                    endif
+                    !-------------------------------
+                    !   sen(l) > 0  :  +1.0 up
+                    !   sen(l) < 0  :  -1.0 down
+                    !-------------------------------
+                    if ( normal(2).gt.0 ) then
+                        add_up = 0.0d0 ; add_down = -1.0d0 
+                    else if ( normal(2).lt.0 ) then
+                        add_up = 1.0d0 ; add_down = 0.0d0 
+                    else ! normal(2)=0
+                        add_up = 0.0d0 ; add_down = 0.0d0 
+                    endif
+                    add_up = add_up*clouds(i)%hcar(2)
+                    add_down = add_down*clouds(i)%hcar(2)
+                    add_right = add_right*clouds(i)%hcar(1)
+                    add_left = add_left*clouds(i)%hcar(1)
+
+                    np = 0 ; list_cld = 0
+                    do j = 1,n ! punto funetes
+                        diff(1) = geometry%coord(1,i) - geometry%coord(1,j) ! coord x 
+                        diff(2) = geometry%coord(2,i) - geometry%coord(2,j) ! coord y
+                        if (  geometry%coord(1,j) .ge. left_lim +add_left  .and.&
+                            & geometry%coord(1,j) .le. right_lim+add_right .and.&
+                            & geometry%coord(2,j) .ge. down_lim +add_down  .and.&
+                            & geometry%coord(2,j) .le. up_lim   +add_up)    then
+                            np = np + 1
+                            dist_cld(np) = j
+                        end if
+                    end do
+
+                    ! ordena de menor a mayor
+                    call mrgrnk(dist(i,dist_cld(1:np)),list_cld(1:np))
+
+                    ! 1.2. asignar memoria
+                    allocate(clouds(i)%pts_dist(np))
+                    allocate(clouds(i)%inv_pts_dist(np))
+                    allocate(clouds(i)%pts_list(np))
+
+                    ! 1.3. definir variables globales
+                    clouds(i)%np_cloud = np
+                    clouds(i)%pts_list(:)=0   ; clouds(i)%pts_list(1:np) = dist_cld(list_cld(1:np))
+                    clouds(i)%pts_dist(:)=0d0 ; clouds(i)%pts_dist(1:np) = dist(i,dist_cld(list_cld(1:np)))
+
+                else
+                    print*, 'selector no ingresado'
+                    print*, 'programa detenido'
+                    stop
+
+                end if
+
+            end do
 
         ELSE
             print*,' INTEGER(4) :: criterio    '
@@ -428,6 +571,9 @@ module variables
             stop
 
         END IF
+
+        ! despejar memoria
+        deallocate(dist,list)
 
         return
     end subroutine GENERAR_NUBES_V1 

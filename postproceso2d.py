@@ -26,6 +26,7 @@ class Meshfree2d_Postproceso_Data():
         self.sol_exact_figure_folder = './GRAFICOS/SOL_EXACT/'
         self.nubes_figure_folder     = './GRAFICOS/CLD/'
         self.shape_figure_folder     = './GRAFICOS/SHP/'
+        self.local_error_folder      = './GRAFICOS/LOCAL_ERROR/'
 
         from os import path,makedirs
         if not path.exists('./GRAFICOS/'):
@@ -67,6 +68,10 @@ class Meshfree2d_Postproceso_Data():
         # shape function figure name
         self.shpfcn_figure = self.shape_figure_folder+filename+fmt
 
+        # local error filename
+        self.localerr_filename1 = self.local_error_folder+filename+'_uvdispl'+fmt
+        self.localerr_filename2 = self.local_error_folder+filename+'_traction'+fmt
+
         # numero de puntos por lado
         self.npts = npts
 
@@ -104,8 +109,8 @@ class Meshfree2d_Postproceso_Data():
                    'PLOT_SOL_EXACT':self.GRAFICAR_SOLUCION_EXACTA_TEST2D,\
                    'ERROR_GLOBAL':self.ERROR_GLOBAL,\
                    'PLOT_CLOUD':self.GRAFICAR_NUBES,\
-                   'PLOT_SF':self.GRAFICAR_FUNCION_FORMA}
-                   #'ERROR_LOCAL':self.ERROR_LOCAL} # pendiente
+                   'PLOT_SF':self.GRAFICAR_FUNCION_FORMA,\
+                   'ERROR_LOCAL':self.ERROR_LOCAL} 
                     
         return mapping
 
@@ -292,6 +297,7 @@ class Meshfree2d_Postproceso_Data():
             nube.append(aux2)
 
         self.nubes = nube
+
         return 
 
     """
@@ -607,6 +613,247 @@ class Meshfree2d_Postproceso_Data():
 
         return
 
+
+
+    """
+        ERROR_LOCAL
+    """
+    def ERROR_LOCAL(self):
+        
+        def calculo_solucion_exacta():
+            from exactsol import SOLUCION_EXACTA
+            solucion=[]
+            for x,y in self.geometry.coord:
+                solucion.append( SOLUCION_EXACTA(self.test,x,y,\
+                    E=self.young_modulus,v=self.poisson_coeff) )
+            u,v,epsxx,epsyy,epsxy,sigmax,sigmay,tauxy = zip(*solucion)
+            self.solexact = self.sol_type(zip(u,v),zip(sigmax,sigmay,tauxy),'linear-elastic')
+            return
+
+        def crear_lista_errores():
+            # CALCULO ERROR - DESPLAZAMIENTOS ----------------
+            # rearrange displacement solution data
+            aux1=[];aux2=[];aux3=[];aux4=[]
+            for u1,v1 in self.solution.displ:
+                aux1.append(u1) ; aux2.append(v1)
+            for u2,v2 in self.solexact.displ:
+                aux3.append(u2) ; aux4.append(v2)
+            uerr=[] ; verr=[] ; uerrabs=[] ; verrabs=[]
+            for u1,v1,u2,v2 in zip(aux1,aux2,aux3,aux4):
+                e_udispl = u1-u2
+                e_vdispl = v1-v2
+                # almacenar en listas
+                uerr.append(e_udispl)
+                verr.append(e_vdispl)
+                # diferencia absoluta
+                uerrabs.append(abs(e_udispl))
+                verrabs.append(abs(e_vdispl))
+            # CALCULO ERROR - TRACCIONES ------------------
+            # rearrange traction solution data
+            aux1=[];aux2=[];aux3=[];aux4=[];aux5=[];aux6=[]
+            for sx1,sy1,tau1 in self.solution.tracc:
+                aux1.append(sx1) ; aux2.append(sy1) ; aux3.append(tau1)
+            for sx2,sy2,tau2 in self.solexact.tracc:
+                aux4.append(sx2) ; aux5.append(sy2) ; aux6.append(tau2)
+            # calculo del error 
+            sxerr=[] ; syerr=[] ; tauerr=[]
+            sxerrabs=[] ; syerrabs=[] ; tauerrabs=[]
+            for sx1,sy1,tau1,sx2,sy2,tau2 in zip(aux1,aux2,aux3,aux4,aux5,aux6):
+                # diferencia
+                e_sx  = sx1-sx2
+                e_sy  = sy1-sy2  
+                e_tau = tau1-tau2
+                # almacenar en listas
+                sxerr.append(e_sx)
+                syerr.append(e_sy)
+                tauerr.append(e_tau)
+                # diferencia absoluta
+                sxerrabs.append(abs(e_sx))
+                syerrabs.append(abs(e_sy))
+                tauerrabs.append(abs(e_tau))
+            #varlist = [uerr,verr,sxerr,syerr,tauerr]
+            varlist = [uerrabs,verrabs,sxerrabs,syerrabs,tauerrabs]
+            ranking = []
+            for var in varlist:
+                ranking.append( [ sorted(var).index(x) for x in var ] )
+            return zip(uerr,verr),zip(sxerr,syerr,tauerr),ranking
+
+        def graficar_error_local():
+            # graficar error
+            from os import path,makedirs
+            if not path.exists(self.local_error_folder):
+                makedirs(self.local_error_folder)
+            titulo1 = "Error local : uapp-uexact"
+            titulo2 = "Error local : $\sigma_{app}-\sigma_{uexact}$"
+            new_tria=[]
+            for pts in self.tria:
+                new_tria.append(tuple(map(sum, zip(pts, (-1,-1,-1)))))
+            PLOT_DISPLACEMENT(titulo1,self.geometry.coord,displ_error,new_tria,self.localerr_filename1,True,self.show)
+            PLOT_TRACTION(titulo2,self.geometry.coord,tracc_error,new_tria,self.localerr_filename2,True,self.show)
+            return
+
+        def graficar_nubes_y_funciones_de_forma():
+            # crear directorio si no existe
+            from os import path,makedirs
+            folders=[self.nubes_figure_folder,self.shape_figure_folder]
+            for folder in folders:
+                if not path.exists(folder):
+                    makedirs(folder)
+
+            n_err = 5  # los 10 puntos con mayores errores para cada var
+                        # es decir, 50 graficos en total como maximo
+
+            # 1. identificar los puntos
+            selected = [ None for i in range(5) ]
+            for i in range(5):
+                selected[i] = ranking[i][:n_err]
+
+            # 3. grafica solo los puntos que presentan mayores errores
+            printed_pts = []
+            for rkn in selected:
+                for i in rkn:
+                    if (not (i in printed_pts)):
+                        printed_pts.append(i) 
+                        title1 = r'Funci\'on de forma, nodo estrella '+str(i)+', test '+self.test
+                        title2 = r'Nube de proximidad, nodo estrella '+str(i)+', test '+self.test
+
+                        new_cld = self.nubes[i]
+                        for k in range(len(new_cld)): # enumeracion de python
+                            new_cld[k] +=  0   # parte de cero
+                        check1,check2 = test_sobre_cada_nube(i)
+
+                        PLOT_CLOUDS(title2,i,self.geometry.coord,self.nubes[i],self.cloud_figure,self.show,[check1,check2])
+                        PLOT_SHAPES(title1,i,self.geometry.coord,self.nubes[i],self.shpfcn[i],self.shpfcn_figure,self.show)
+            return
+
+        def test_sobre_cada_nube(idpt):
+            # Test1 for N, N,x and N,xx using f(x,y)=x^2+y^2
+            def test1(x,y):
+                return pow(x,2) + pow(y,2) 
+            def exact1(x,y):
+                f = [ 0 for i in range(6) ]
+                f[0] = pow(x,2) + pow(y,2) 
+                f[1] = 2.0*x
+                f[2] = 2.0*y
+                f[3] = 2.0 
+                f[4] = 0.0
+                f[5] = 2.0
+                return f
+            ## PENDIENTE!!
+            # Test2 for N, N,x and N,xx using f(x,y)=64.0*x*y*(1.0-x)*(1.0-y)
+            #def test2(x,y):
+            #    return 64.0*x*y*(1.0-x)*(1.0-y)
+            #def fap2(x,y):
+            #    f = [ 0 for i in range(6) ]
+            #    f[1] = 64.0*x*y*(1.0-x)*(1.0-y)
+            #    f[1] = -64.*x*y*(y-1.0)+64.0*y*(x-1.0)*(y-1.0)
+            #    f[2] = -64.*x*y*(x-1.0)+64.0*x*(x-1.0)*(y-1.0)
+            #    f[3] = +128.*y*(y-1.0)
+            #    f[4] = 64.0*((1.0-x)*(1.0-y)-x*(1.0-y)-y*(1.0-x)+x*y)
+            #    f[5] = +128.*x*(x-1.0)
+            #    return f
+            def dot(x, y):
+                """Dot product as sum of list comprehension
+                 doing element-wise multiplication"""
+                return sum(x_i*y_i for x_i, y_i in zip(x, y))
+
+            cld = self.nubes[idpt]
+            for k in range(len(cld)): # enumeracion de python
+                cld[k] = cld[k] - 1   # parte de cero
+            xnear = [ self.geometry.coord[ii] for ii in cld ]
+
+            xstar,ystar = xnear[0]
+            rearrange = list(zip(*xnear))
+            rearrange.extend(self.shpfcn[idpt])
+            check = [ 0 for i in range(6) ]
+            aux   = [ 0 for i in range(6) ]
+
+            xdiff=[];ydiff=[]
+            for x,y in xnear:
+                xdiff.append(x-xstar)
+                ydiff.append(y-ystar)
+            phi = self.shpfcn[idpt]
+
+            # ::::: CHECK CONSISTENCY :::::
+
+            # PU consistency
+            check[0] = abs(1.0-sum(phi[0]))
+
+            # Linear consistency 
+            aux[0] = abs(dot(xdiff,phi[0]))
+            aux[1] = abs(dot(ydiff,phi[0]))
+            check[1] = sum(aux[0:2])
+
+            # PU derivarive 
+            aux[0] = abs(sum(phi[1]))
+            aux[1] = abs(sum(phi[2]))
+            check[2] = sum(aux[0:2])
+
+            # Linear consistency derivative
+            aux[0] = abs(1.0-dot(xdiff,phi[1]))
+            aux[1] = abs(dot(xdiff,phi[2]))
+            aux[2] = abs(1.0-dot(ydiff,phi[2]))
+            aux[3] = abs(dot(ydiff,phi[1]))
+            check[3] = sum(aux[0:4])
+
+            # PU hessian
+            aux[0] = abs(sum(phi[3]))
+            aux[1] = abs(sum(phi[4]))
+            aux[2] = abs(sum(phi[5]))
+            check[4] = sum(aux[0:3]) 
+
+            # Linear consistency hessian
+            aux[0] = abs(dot(xdiff,phi[3]))
+            aux[1] = abs(dot(xdiff,phi[4]))
+            aux[2] = abs(dot(ydiff,phi[4]))
+            aux[3] = abs(dot(ydiff,phi[5]))
+            check[5] = sum(aux[0:4])
+
+            # en caso de querer aplicar mas tests
+            for test,exact in [[test1,exact1]]:
+                # valor de la funcion test
+                fap = exact(xstar,ystar)
+                for x,y,p1,p2,p3,p4,p5,p6 in zip(*rearrange):
+                    phi = [p1,p2,p3,p4,p5,p6]
+                    for k in range(6):
+                        fap[k] -= phi[k]*test(x,y)
+
+            return [check,fap]
+
+        # lectura data
+        self.LECTURA_DATA()
+        self.LECTURA_ELEMENTOS()
+
+        # constantes elasticidad lineal
+        E = self.young_modulus # modulo de young
+        v = self.poisson_coeff # coeff de poisson
+
+        # numero de puntos (de colocacion) del dominio
+        npoin = len(self.geometry.coord)
+
+        # solucion aproximada
+        self.LECTURA_SOLUCION()      # almacenado en self.solucion
+        
+        # calculo solucion exacta en los puntos importados
+        calculo_solucion_exacta()    # almacenado en self.solexact
+
+        # calculo del error y almacenamiento en listas
+        # orden descendiente ( error[0] = max_error )
+        displ_error, tracc_error, ranking = crear_lista_errores()
+
+        ## graficar error local
+        #graficar_error_local()
+
+        # importar datos nubes locales
+        self.IMPORTAR_NUBES()
+        self.IMPORTAR_FUNCION_DE_FORMA()
+
+        # graficar funcion de formas en los primeros n_err datos
+        # segun error descendiente (plot cloud & shape functiones)
+        graficar_nubes_y_funciones_de_forma()
+
+        return
+
     """
         ERROR_GLOBAL
     """
@@ -751,7 +998,7 @@ def PLOT_SHAPES(title,idpt,coords,connect,phi,filename,show):
 
 
 
-def PLOT_CLOUDS(title,idpt,coords,connect,filename,show):
+def PLOT_CLOUDS(title,idpt,coords,connect,filename,show,errors):
         
     import matplotlib.pyplot as plt
 
@@ -776,16 +1023,18 @@ def PLOT_CLOUDS(title,idpt,coords,connect,filename,show):
     fig.suptitle(title, fontsize=12)
 
     #crear subfigura NUBE
-    ax = fig.add_subplot(111)
+    ax1 = fig.add_subplot(211)
+    ax2 = fig.add_subplot(212)
 
     # asignar ejes
-    ax.set_xlabel( r'$x$' ) ; ax.set_ylabel( r'$y$' ) 
-    ax.set_aspect(dy/dx)
+    ax1.set_xlabel( r'$x$' )
+    ax1.set_ylabel( r'$y$' ) 
+    ax1.set_aspect(dy/dx)
 
     # plot
-    ax.scatter(x,y,color='black')              # puntos del dominio
-    ax.scatter(xcld,ycld,color='green',s=80)     # nube de puntos
-    ax.scatter(xcld[0],ycld[0],color='red',s=80)     # punto estrella
+    ax1.scatter(x,y,color='black')              # puntos del dominio
+    ax1.scatter(xcld,ycld,color='green',s=80)     # nube de puntos
+    ax1.scatter(xcld[0],ycld[0],color='red',s=80)     # punto estrella
 
     # obtener anillo convexo de la nube
     from scipy.spatial import ConvexHull
@@ -795,10 +1044,40 @@ def PLOT_CLOUDS(title,idpt,coords,connect,filename,show):
         cnvx_coords.append(cld_coords[pt])
     cnvx_coords.append(cld_coords[cnvx.vertices[0]])
     xcnvx,ycnvx=zip(*cnvx_coords)
-    ax.plot(xcnvx,ycnvx)
+    ax1.plot(xcnvx,ycnvx)
     
     # relacion de aspecto ejes x,y
-    ax.set_aspect('equal')
+    ax1.set_aspect('equal')
+
+    # ::::::::::::::::::::::::
+    ax2.axis('off')
+
+    Consistency,Poisson_Test = errors
+
+    texto  = ""
+    texto += "Calidad de la nube\n \n"
+
+    texto += "\\begin{tabular}{ll}"
+    texto += "\multicolumn{1}{l}{Consistencia de orden 0 y 1}\\\ "
+    texto += "Partition of unity : &"+str(Consistency[0])+"\\\ "
+    texto += "Linear consistency : &"+str(Consistency[1])+"\\\ "
+    texto += "Derivative Partition of unity : &"+str(Consistency[2])+"\\\ "
+    texto += "Derivative Linear consistency : &"+str(Consistency[3])+"\\\ "
+    texto += "Hessian Partition of unity : &"+str(Consistency[4])+"\\\ "
+    texto += "Hessian Linear consistency : &"+str(Consistency[5])+"\\\ "
+
+    texto += "\multicolumn{1}{l}{}\\\ " #espacio en blanco
+
+    texto += "\multicolumn{1}{l}{Test Poisson}\\\ "
+    texto += "$\phi$ error :& "+str(Poisson_Test[0])+"\\\ "
+    texto += "$\partial \phi / \partial x$ error :& "+str(Poisson_Test[1])+"\\\ "
+    texto += "$\partial \phi / \partial y$ error :& "+str(Poisson_Test[2])+"\\\ "
+    texto += "$\partial^2 \phi / \partial^2$ x error :& "+str(Poisson_Test[3])+"\\\ "
+    texto += "$\partial^2 \phi / \partial x \partial y$ error :& "+str(Poisson_Test[4])+"\\\ "
+    texto += "$\partial^2 \phi / \partial^2 y$ error :& "+str(Poisson_Test[5])+" "
+    texto += "\\end{tabular}"
+
+    ax2.text(0.5, 0.5, texto, horizontalalignment='left', verticalalignment='center', transform=ax2.transAxes)
 
     # distancia entre graficos
     fig.tight_layout()
