@@ -359,8 +359,7 @@ class Meshfree2d_Postproceso_Data():
 
 
     """
-        GRAFICAR_NUBES:
-        Rutina principal que lee las nubes y las grafica
+        RUTINA OBSOLETA
     """
     def GRAFICAR_NUBES(self):
         
@@ -391,8 +390,7 @@ class Meshfree2d_Postproceso_Data():
         return
     
     """
-        GRAFICAR_NUBES:
-        Rutina principal que lee las nubes y las grafica
+        RUTINA OBSOLETA
     """
     def GRAFICAR_FUNCION_FORMA(self):
         
@@ -676,7 +674,12 @@ class Meshfree2d_Postproceso_Data():
             ranking = []
             for var in varlist:
                 ranking.append( [ sorted(var).index(x) for x in var ] )
-            return zip(uerr,verr),zip(sxerr,syerr,tauerr),ranking
+
+            displ_error = zip(uerr,verr)
+            tracc_error = zip(sxerr,syerr,tauerr)
+            ranking = ranking
+
+            return [ displ_error, tracc_error, ranking ]
 
         def graficar_error_local():
             # graficar error
@@ -713,16 +716,17 @@ class Meshfree2d_Postproceso_Data():
             for rkn in selected:
                 for i in rkn:
                     if (not (i in printed_pts)):
-                        printed_pts.append(i) 
-                        title1 = r'Funci\'on de forma, nodo estrella '+str(i)+', test '+self.test
-                        title2 = r'Nube de proximidad, nodo estrella '+str(i)+', test '+self.test
 
-                        new_cld = self.nubes[i]
-                        for k in range(len(new_cld)): # enumeracion de python
-                            new_cld[k] +=  0   # parte de cero
+                        printed_pts.append(i) 
+                        title1 = r'Funci\'on de forma, test '+self.test
+                        title2 = r'Nube de proximidad, test '+self.test
                         check1,check2 = test_sobre_cada_nube(i)
 
-                        PLOT_CLOUDS(title2,i,self.geometry.coord,self.nubes[i],self.cloud_figure,self.show,[check1,check2])
+                        # error puntual en el i-esimo punto
+                        local_puntual_err = [ self.error_solution.displ[i] , self.error_solution.tracc[i] ] 
+
+                        # graficar nubes de proximidad y funciones de forma (archivos separados)
+                        PLOT_CLOUDS(title2,i,self.geometry.coord,self.nubes[i],self.cloud_figure,self.show,[check1,check2],error_global,local_puntual_err)
                         PLOT_SHAPES(title1,i,self.geometry.coord,self.nubes[i],self.shpfcn[i],self.shpfcn_figure,self.show)
             return
 
@@ -840,6 +844,12 @@ class Meshfree2d_Postproceso_Data():
         # calculo del error y almacenamiento en listas
         # orden descendiente ( error[0] = max_error )
         displ_error, tracc_error, ranking = crear_lista_errores()
+        self.error_solution = self.sol_type(displ_error, tracc_error, 'linear-elastic')
+        # error global considerando distintas mediciones
+        #   - promedio
+        #   - promedio cuadratico
+        #   - inf-norm
+        error_global = CALCULO_ERROR_GLOBAL(self.error_solution)
 
         ## graficar error local
         #graficar_error_local()
@@ -926,8 +936,33 @@ class Meshfree2d_Postproceso_Data():
         return
 
 
+
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+def CALCULO_ERROR_GLOBAL( sol_input ):
+    # desempacketar data
+    displ_err = sol_input.displ
+    tracc_err = sol_input.tracc
+    uerr,verr = zip(*displ_err)
+    sigxerr,sigyerr,tauerr = zip(*tracc_err)
+    # almacena el error global
+    storage=[] 
+    # calculo error global
+    for vec in [uerr,verr,sigxerr,sigyerr,tauerr]:
+        # promedio
+        diff1 = 0.0
+        for val in vec:
+            diff1 += abs(val)
+        # promedio cuadratico L2/H2
+        diff2 = 0.0
+        for val in vec:
+            diff2 += pow(val,2)
+        # inf norm
+        diff3 = 0.0
+        for val in vec:
+            diff3 = max(val,diff3)
+        storage.append([diff1,diff2,diff3])
+    return storage
 
 def PLOT_SHAPES(title,idpt,coords,connect,phi,filename,show):
 
@@ -998,9 +1033,10 @@ def PLOT_SHAPES(title,idpt,coords,connect,phi,filename,show):
 
 
 
-def PLOT_CLOUDS(title,idpt,coords,connect,filename,show,errors):
+def PLOT_CLOUDS(title,idpt,coords,connect,filename,show,errors,global_err,local_err):
         
     import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
 
     # coordenadas pts nubes
     cld_coords = []
@@ -1018,13 +1054,24 @@ def PLOT_CLOUDS(title,idpt,coords,connect,filename,show,errors):
     plt.rc('font', family='serif')
 
     # crear figura NUBE
-    fig=plt.figure(num=None,figsize=(8,6),dpi=80,facecolor='w',edgecolor='k')
+    #fig = plt.figure(num=None,figsize=(10,6),dpi=80,facecolor='w',edgecolor='k')
+    fig = plt.figure(figsize=(10, 6),constrained_layout=False)
+    gs = fig.add_gridspec(nrows=3, ncols=2, wspace=0, hspace=0 )
+    #gs = fig.add_gridspec(nrows=2, ncols=2, left=0, right=1, wspace=0, hspace=0, width_ratios=[2,1], height_ratios=[1,1])
     title += r", idpt="+str(idpt+1)
     fig.suptitle(title, fontsize=12)
 
-    #crear subfigura NUBE
-    ax1 = fig.add_subplot(211)
-    ax2 = fig.add_subplot(212)
+    ##crear subfigura NUBE
+    ax1 = fig.add_subplot(gs[2, :])
+    ax2 = fig.add_subplot(gs[0, :])
+    ax3 = fig.add_subplot(gs[1, 0])
+    ax4 = fig.add_subplot(gs[1, 1])
+
+    # agregar titulos si se desea
+    #ax1.set_title('subtitulo1')
+    #ax2.set_title('subtitulo2')
+    #ax3.set_title('subtitulo3')
+    #ax4.set_title('subtitulo4')
 
     # asignar ejes
     ax1.set_xlabel( r'$x$' )
@@ -1052,36 +1099,61 @@ def PLOT_CLOUDS(title,idpt,coords,connect,filename,show,errors):
     # ::::::::::::::::::::::::
     ax2.axis('off')
 
-    Consistency,Poisson_Test = errors
+    variables = ["Despl. $u$","Despl. $v$","Esf.normal $\\sigma_x$",\
+            "Esf.normal $\\sigma_y$","Esf.cortante $\\tau_{xy}$"]
 
     texto  = ""
-    texto += "Calidad de la nube\n \n"
+    texto += "\\begin{tabular}{p{10em}p{15em}p{15em}p{15em}|p{15em}}"
+    texto += "Variable & Promedio & Prom.Cuadr. & Norm.Inf. & Error Local\\\ "
+    local_error = [] ; c=0
+    for values in local_err:
+        for val in values:
+            local_error.append(val)
+    for var,err in zip(variables,global_err):
+        er1,er2,er3 = err ; er4 = local_error[c] ; c+=1
+        #texto += "{0:>15s} & {1:>20.8f} & {2:>20.8f} & {3:>20.8f}\\\ ".format(var,er1,er2,er3)
+        texto += "{0} & {1} & {2} & {3} &{4}\\\ ".format(var,er1,er2,er3,er4)
 
-    texto += "\\begin{tabular}{ll}"
-    texto += "\multicolumn{1}{l}{Consistencia de orden 0 y 1}\\\ "
-    texto += "Partition of unity : &"+str(Consistency[0])+"\\\ "
-    texto += "Linear consistency : &"+str(Consistency[1])+"\\\ "
-    texto += "Derivative Partition of unity : &"+str(Consistency[2])+"\\\ "
-    texto += "Derivative Linear consistency : &"+str(Consistency[3])+"\\\ "
-    texto += "Hessian Partition of unity : &"+str(Consistency[4])+"\\\ "
-    texto += "Hessian Linear consistency : &"+str(Consistency[5])+"\\\ "
-
-    texto += "\multicolumn{1}{l}{}\\\ " #espacio en blanco
-
-    texto += "\multicolumn{1}{l}{Test Poisson}\\\ "
-    texto += "$\phi$ error :& "+str(Poisson_Test[0])+"\\\ "
-    texto += "$\partial \phi / \partial x$ error :& "+str(Poisson_Test[1])+"\\\ "
-    texto += "$\partial \phi / \partial y$ error :& "+str(Poisson_Test[2])+"\\\ "
-    texto += "$\partial^2 \phi / \partial^2$ x error :& "+str(Poisson_Test[3])+"\\\ "
-    texto += "$\partial^2 \phi / \partial x \partial y$ error :& "+str(Poisson_Test[4])+"\\\ "
-    texto += "$\partial^2 \phi / \partial^2 y$ error :& "+str(Poisson_Test[5])+" "
     texto += "\\end{tabular}"
 
-    ax2.text(0.5, 0.5, texto, horizontalalignment='left', verticalalignment='center', transform=ax2.transAxes)
+    ax2.text(0, 0.5, texto, horizontalalignment='left', verticalalignment='center', transform=ax2.transAxes)
 
-    # distancia entre graficos
-    fig.tight_layout()
-    
+    # ::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+    ax3.axis('off')
+
+    Consistency,Poisson_Test = errors
+
+    variables = ["Partition of unity","Linear consistency",\
+        "Derivative Partition of unity","Derivative Linear consistency",\
+        "Hessian Partition of unity","Hessian Linear consistency"]
+
+    texto  = ""
+    texto += "\\begin{tabular}{p{15em}p{15em}}"
+    texto += "\multicolumn{1}{l}{Consistencia de orden 0 y 1}\\\ "
+    for var,cons in zip(variables,Consistency):
+        texto += "{0} & {1}\\\ ".format(var,cons)
+    texto += "\\end{tabular}"
+
+    ax3.text(0, 0.5, texto, horizontalalignment='left', verticalalignment='center', transform=ax3.transAxes)
+
+    # ::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+    ax4.axis('off')
+
+    variables = ["$\phi$","$\partial \phi / \partial x$","$\partial \phi / \partial y$",\
+        "$\partial^2 \phi / \partial^2 x$","$\partial^2 \phi / \partial x \partial y$",\
+        "$\partial^2 \phi / \partial^2 y$"]
+
+    texto  = ""
+    texto += "\\begin{tabular}{p{15em}p{15em}}"
+    texto += "\multicolumn{1}{l}{Test Poisson}\\\ "
+    for var,poiss in zip(variables,Poisson_Test):
+        texto += "{0} & {1}\\\ ".format(var,poiss)
+    texto += "\\end{tabular}"
+
+    ax4.text(0, 0.5, texto, horizontalalignment='left', verticalalignment='center', transform=ax4.transAxes)
+
     # archivo a exportar
     fmt = filename.split('.')[-1] 
     filename=filename.replace('.'+fmt,'_'+str(idpt+1)+'.'+fmt)

@@ -15,7 +15,7 @@ def boundary_condition_assignment(test,lado,pt):
         elif ( lado == 1 ): # borde derecho
             cond = 4       #   -> tau_traction
         elif ( lado == 2 ): # borde superior 
-            cond = 4       #   -> tau_traction (zero)
+            cond = 0       #   -> tau_traction (zero)
         elif ( lado == 3 ): # borde izquierdo
             cond = 1       #   -> only_u_displacement
         ## ----- segun un punto en particular ----- ##
@@ -86,7 +86,7 @@ def order_boundary_list(test):
         # IV |     | II   en III : preesc. dot(sigma,n) = traction
         #    |_____|      en IV  : preesc. u=0 y dot(sigma,n)_y = ty
         #       I
-        priority_order_list = [ 1 , 2 , 0 , 3 ]
+        priority_order_list = [ 2 , 0 , 3 , 1 ]
     elif ( test == 'patchtest-2' ):
         #     _III_       en I   : preesc. v=0 y dot(sigma,n)_x = tx
         #    |     |      en II  : preesc. dot(sigma,n) = traction

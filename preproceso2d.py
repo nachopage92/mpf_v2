@@ -116,7 +116,6 @@ class Preprocess_Data_Type():
         for elem in inormal:
             perm[elem] = c
             c+=1
-        
 
         # 3.   Loop sobre los puntos de contorno,  en este paso
         #    se asignan las condiciones de contorno y el vector
@@ -218,9 +217,9 @@ class Preprocess_Data_Type():
             xnorm,cond = self.bdry[pts]
             (u,v),(Tx,Ty) = self.rhs[pts]
             if ( cond == 1 ):
-                f.write('{0:5d} {1:5d} {2:5d} {3:20.13f} {4:20.13f}\n'.format(pts,1,0,u,v))
+                f.write('{0:5d} {1:5d} {2:5d} {3:20.13f} {4:20.13f}\n'.format(pts,1,0,u,0))
             elif ( cond == 2 ):
-                f.write('{0:5d} {1:5d} {2:5d} {3:20.13f} {4:20.13f}\n'.format(pts,0,1,u,v))
+                f.write('{0:5d} {1:5d} {2:5d} {3:20.13f} {4:20.13f}\n'.format(pts,0,1,0,v))
             elif ( cond == 3 ):
                 f.write('{0:5d} {1:5d} {2:5d} {3:20.13f} {4:20.13f}\n'.format(pts,1,1,u,v))
 
@@ -230,7 +229,7 @@ class Preprocess_Data_Type():
             # extraer data
             xnorm,cond = self.bdry[pts]
             (u,v),(Tx,Ty) = self.rhs[pts]
-            if ( cond == 1 or cond == 2 or cond == 4 ):
+            if ( cond == 4 ):
                 f.write('{0:5d} {1:25.13e} {2:25.13e}\n'.format(pts,Tx,Ty))
 
         # -------------------------
@@ -350,19 +349,19 @@ class Preprocess_Data_Type():
         xbdry,ybdry = zip(*bdry_coord)
 
         # crear listas segun condicion
-        dict_cond = { 1:[] , 2:[] , 3:[] , 4:[] }
-        dict_color = {1:'blue',2:'green',3:'brown',4:'red'}
-        dict_label = {1:r'Desplazamiento $(1,0)$',2:r'Desplazamiento $(0,1)$'\
+        dict_cond = { 0:[], 1:[] , 2:[] , 3:[] , 4:[] }
+        dict_color = {0:'pink',1:'blue',2:'green',3:'brown',4:'red'}
+        dict_label = {0:r'None',1:r'Desplazamiento $(1,0)$',2:r'Desplazamiento $(0,1)$'\
                         ,3:r'Desplazamiento $(1,1)$',4:r'Esfuerzos $(T_x,T_y)$'}
 
         for i in range(len(bdry_pts)):
-            if ( not cond[i] in [1,2,3,4]  ) :
+            if ( not cond[i] in [0,1,2,3,4]  ) :
                 from sys import exit
                 exit('ERROR: id contorno no registrada.')
             dict_cond[cond[i]].append(bdry_pts[i])
 
             # contornos que poseen condiciones de neumann
-            if ( cond[i]==1 or cond[i]==2 or cond[i]==4 ) :
+            if ( cond[i]==0 or cond[i]==1 or cond[i]==2 or cond[i]==4 ) :
                 ax.quiver(xbdry[i],ybdry[i],xnorm[i],ynorm[i])
                 
         for idcon in dict_cond:
